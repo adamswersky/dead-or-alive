@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dead or Alive?</title>
+<meta name="description" content="Swipe right if they're alive, left if they're dead. How well do you know which stars are still with us?">
+<meta property="og:title" content="Are They Dead or Alive?">
+<meta property="og:description" content="Swipe right if they're alive, left if they're dead. Beat my score.">
+<meta name="theme-color" content="#f6f0e4">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💀</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f6f0e4; --ink:#1a1714; --muted:#6b6258; --card:#fffaf0; --line:#1a1714;
+  --alive:#17905a; --alive-soft:#d6f2e2; --dead:#d23b2e; --dead-soft:#fbdcd8;
+  --accent:#f2b705; --shadow:6px 6px 0 var(--line);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15120f; --ink:#f3ecdf; --muted:#a89d90; --card:#221d18; --line:#f3ecdf;
+    --alive:#3ccf86; --alive-soft:#173828; --dead:#ff6a5c; --dead-soft:#3d1a16; --accent:#f2b705;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#15120f; --ink:#f3ecdf; --muted:#a89d90; --card:#221d18; --line:#f3ecdf;
+  --alive:#3ccf86; --alive-soft:#173828; --dead:#ff6a5c; --dead-soft:#3d1a16; --accent:#f2b705;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:"Bricolage Grotesque",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased; overflow-x:hidden;
+  touch-action:manipulation;
+}
+button{font:inherit;color:inherit;cursor:pointer}
+.app{max-width:460px;margin:0 auto;min-height:100dvh;padding:16px 16px calc(16px + env(safe-area-inset-bottom));display:flex;flex-direction:column}
+.screen{display:none;flex:1;flex-direction:column}
+.screen.on{display:flex}
+
+/* ---------- shared ---------- */
+.btn{
+  border:3px solid var(--line); background:var(--card); border-radius:14px;
+  padding:14px 18px; font-weight:800; font-size:18px; box-shadow:4px 4px 0 var(--line);
+  transition:transform .08s, box-shadow .08s;
+}
+.btn:active{transform:translate(3px,3px);box-shadow:1px 1px 0 var(--line)}
+.btn.primary{background:var(--accent);color:#1a1714}
+.btn.small{font-size:15px;padding:10px 14px;border-radius:12px}
+.muted{color:var(--muted)}
+.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(30px);opacity:0;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-weight:600;transition:.25s;pointer-events:none;z-index:50}
+.toast.on{opacity:1;transform:translateX(-50%)}
+
+/* ---------- start ---------- */
+.hero{flex:1;display:flex;flex-direction:column;justify-content:center;gap:22px;text-align:center}
+.logo{font-size:clamp(46px,14vw,68px);line-height:.9;font-weight:800;letter-spacing:-.03em;margin:0}
+.logo .d{color:var(--dead)} .logo .a{color:var(--alive)}
+.logo small{display:block;font-size:.36em;letter-spacing:.02em;margin-bottom:6px;color:var(--muted);font-weight:600}
+.skulls{font-size:44px;display:flex;justify-content:center;gap:14px}
+.skulls span{display:inline-block;animation:bob 2.4s ease-in-out infinite}
+.skulls span:nth-child(2){animation-delay:.3s}.skulls span:nth-child(3){animation-delay:.6s}
+@keyframes bob{50%{transform:translateY(-8px) rotate(-6deg)}}
+.how{display:grid;grid-template-columns:1fr 1fr;gap:10px;text-align:left}
+.how div{border:3px solid var(--line);border-radius:14px;padding:12px;background:var(--card);font-weight:600;font-size:15px}
+.how b{display:block;font-size:22px}
+.how .l b{color:var(--dead)} .how .r b{color:var(--alive)}
+.challenge{border:3px dashed var(--dead);border-radius:14px;padding:12px 14px;font-weight:600;background:var(--dead-soft);display:none}
+.challenge.on{display:block}
+.fine{font-size:12px;color:var(--muted)}
+
+/* ---------- play ---------- */
+.hud{display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:16px;gap:10px}
+.progress{flex:1;height:10px;border:2px solid var(--line);border-radius:99px;overflow:hidden;background:var(--card)}
+.progress i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s}
+.streak{min-width:56px;text-align:right}
+.deck{position:relative;flex:1;min-height:420px;margin:18px 0 16px}
+.card{
+  position:absolute;inset:0;border:3px solid var(--line);border-radius:24px;background:var(--card);
+  box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden;
+  user-select:none;-webkit-user-select:none;touch-action:none;will-change:transform;
+}
+.card.back{transform:scale(.94) translateY(14px);box-shadow:none;opacity:.7}
+.card.fly{transition:transform .38s cubic-bezier(.4,.1,.6,1), opacity .38s}
+.card.snap{transition:transform .25s cubic-bezier(.2,1.4,.4,1)}
+.portrait{flex:1;display:grid;place-items:center;font-size:clamp(110px,34vw,150px);position:relative;border-bottom:3px solid var(--line)}
+.portrait .q{position:absolute;top:12px;left:14px;font-size:14px;font-weight:800;background:var(--card);color:var(--ink);border:2px solid var(--line);border-radius:99px;padding:4px 10px}
+.info{padding:16px 18px 20px}
+.info h2{margin:0;font-size:clamp(28px,8vw,36px);line-height:1;letter-spacing:-.02em}
+.info p{margin:8px 0 0;color:var(--muted);font-weight:600;font-size:16px}
+.stamp{
+  position:absolute;top:34px;font-size:46px;font-weight:800;letter-spacing:.04em;padding:2px 14px;
+  border:6px solid;border-radius:12px;opacity:0;pointer-events:none;background:color-mix(in srgb,var(--card) 70%,transparent)
+}
+.stamp.alive{left:20px;color:var(--alive);transform:rotate(-14deg)}
+.stamp.dead{right:20px;color:var(--dead);transform:rotate(14deg)}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.controls .btn{font-size:22px;padding:16px}
+.controls .dead{background:var(--dead);color:#fff}
+.controls .alive{background:var(--alive);color:#fff}
+.hint{text-align:center;font-size:13px;margin-top:10px}
+
+/* reveal sheet */
+.sheet{
+  position:fixed;left:0;right:0;bottom:0;z-index:20;transform:translateY(105%);transition:transform .32s cubic-bezier(.2,1,.3,1);
+  display:flex;justify-content:center;padding:0 12px calc(12px + env(safe-area-inset-bottom));
+}
+.sheet.on{transform:none}
+.sheet .inner{max-width:440px;width:100%;background:var(--card);border:3px solid var(--line);border-radius:22px;padding:18px 18px 16px;box-shadow:var(--shadow)}
+.verdict{font-size:30px;font-weight:800;margin:0;letter-spacing:-.02em}
+.verdict.ok{color:var(--alive)} .verdict.no{color:var(--dead)}
+.truth{font-size:18px;font-weight:600;margin:6px 0 0}
+.fact{font-size:15px;color:var(--muted);margin:8px 0 14px;line-height:1.35}
+.sheet .btn{width:100%}
+
+/* ---------- end ---------- */
+.result{text-align:center;display:flex;flex-direction:column;gap:14px;padding-top:8px}
+.big{font-size:84px;font-weight:800;line-height:.9;letter-spacing:-.04em;margin:0}
+.big small{font-size:.4em;color:var(--muted)}
+.rank{display:inline-block;margin:0 auto;font-weight:800;font-size:20px;background:var(--accent);color:#1a1714;border:3px solid var(--line);border-radius:12px;padding:6px 14px;transform:rotate(-2deg)}
+.grid{font-size:26px;letter-spacing:2px;line-height:1.2}
+.shock{font-weight:600;font-size:16px}
+.vs{font-weight:800;font-size:18px}
+.namebox{display:flex;gap:8px}
+.namebox input{flex:1;min-width:0;font:inherit;font-size:16px;font-weight:600;padding:12px 14px;border:3px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink)}
+.share-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.share-row .wide{grid-column:1/-1}
+.review{text-align:left;border:3px solid var(--line);border-radius:16px;background:var(--card);overflow:hidden}
+.review summary{padding:12px 14px;font-weight:800;cursor:pointer}
+.review ol{margin:0;padding:0 14px 12px 14px;list-style:none}
+.review li{display:flex;gap:10px;align-items:baseline;padding:8px 0;border-top:1px solid color-mix(in srgb,var(--line) 20%,transparent);font-size:15px}
+.review li b{flex:1}
+.tag{font-size:12px;font-weight:800;padding:2px 8px;border-radius:99px;white-space:nowrap}
+.tag.alive{background:var(--alive-soft);color:var(--alive)} .tag.dead{background:var(--dead-soft);color:var(--dead)}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- START -->
+  <section class="screen on" id="start">
+    <div class="hero">
+      <div class="skulls"><span>💀</span><span>🕺</span><span>🪦</span></div>
+      <h1 class="logo"><small>Are they</small><span class="d">Dead</span> or <span class="a">Alive?</span></h1>
+      <div class="challenge" id="challenge"></div>
+      <div class="how">
+        <div class="l"><b>← Dead</b>Swipe left if you think they've shuffled off</div>
+        <div class="r"><b>Alive →</b>Swipe right if they're still kicking</div>
+      </div>
+      <button class="btn primary" id="playBtn">Let's find out</button>
+      <p class="fine">15 stars per round. Facts checked November 2026.</p>
+    </div>
+  </section>
+
+  <!-- PLAY -->
+  <section class="screen" id="play">
+    <div class="hud">
+      <span id="count">1/15</span>
+      <div class="progress"><i id="bar"></i></div>
+      <span class="streak" id="streak">🔥 0</span>
+    </div>
+    <div class="deck" id="deck"></div>
+    <div class="controls">
+      <button class="btn dead" id="deadBtn">💀 Dead</button>
+      <button class="btn alive" id="aliveBtn">Alive 💚</button>
+    </div>
+    <p class="hint muted">Swipe, tap, or use ← →</p>
+  </section>
+
+  <!-- END -->
+  <section class="screen" id="end">
+    <div class="result">
+      <p class="muted" style="margin:0;font-weight:800">YOUR SCORE</p>
+      <p class="big" id="score">0<small>/15</small></p>
+      <span class="rank" id="rank"></span>
+      <div class="vs" id="vs"></div>
+      <div class="grid" id="grid"></div>
+      <div class="shock" id="shock"></div>
+      <div class="namebox">
+        <input id="name" maxlength="20" placeholder="Your name (for the challenge)" autocomplete="nickname">
+      </div>
+      <div class="share-row">
+        <button class="btn primary wide" id="shareBtn">📣 Challenge your friends</button>
+        <button class="btn small" id="waBtn">WhatsApp</button>
+        <button class="btn small" id="copyBtn">Copy link</button>
+        <button class="btn small wide" id="imgBtn">🖼️ Save score card</button>
+      </div>
+      <details class="review">
+        <summary>See all the answers</summary>
+        <ol id="review"></ol>
+      </details>
+      <button class="btn" id="againBtn">Play again (new stars)</button>
+      <p class="fine">Facts checked November 2026. Celebrities, inconveniently, keep changing status.</p>
+    </div>
+  </section>
+</div>
+
+<div class="sheet" id="sheet">
+  <div class="inner">
+    <p class="verdict" id="verdict"></p>
+    <p class="truth" id="truth"></p>
+    <p class="fact" id="fact"></p>
+    <button class="btn primary" id="nextBtn">Next →</button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ------------------------------------------------------------------
+   DATA — status as of November 2026.
+   a: true = alive. b = birth year. d = death year, age = age at death.
+   To add someone, append to the END of the list (keeps old challenge links valid).
+------------------------------------------------------------------- */
+const PEOPLE = [
+  // --- Dead ---
+  {n:"Chuck Norris", k:"Walker, Texas Ranger · the internet's hardest man", e:"🥋", a:false, d:2026, age:86, f:"Posted a sparring video for his 86th birthday just nine days before he died in March 2026."},
+  {n:"Dolly Parton", k:"9 to 5 · Jolene · Dollywood", e:"🦋", a:false, d:2026, age:80, f:"Died in August 2026. Her Imagination Library has given away well over 200 million free books to kids."},
+  {n:"Patrick Stewart", k:"Captain Picard · Professor X", e:"🖖", a:false, d:2026, age:86, f:"Died in October 2026. Make it so."},
+  {n:"Robert Duvall", k:"The Godfather · Apocalypse Now", e:"🚁", a:false, d:2026, age:95, f:"Died in February 2026. He loved the smell of napalm in the morning."},
+  {n:"Eva Marie Saint", k:"On the Waterfront · North by Northwest", e:"🎞️", a:false, d:2026, age:102, f:"Died in October 2026 at 102, one of the last stars of Hollywood's golden age."},
+  {n:"Walter Koenig", k:"Chekov in Star Trek", e:"🚀", a:false, d:2026, age:90, f:"Died in October 2026. His captain, William Shatner, outlived him."},
+  {n:"Hulk Hogan", k:"Hulkamania · 80s WWF icon", e:"💪", a:false, d:2025, age:71, f:"Died in July 2025, brother."},
+  {n:"Ozzy Osbourne", k:"Black Sabbath · The Osbournes", e:"🦇", a:false, d:2025, age:76, f:"Played a farewell show in Birmingham in July 2025 and died just 17 days later."},
+  {n:"Gene Hackman", k:"The French Connection · Superman's Lex Luthor", e:"🕵️", a:false, d:2025, age:95, f:"Died in early 2025 after more than 20 years of quiet retirement in Santa Fe."},
+  {n:"Val Kilmer", k:"Top Gun's Iceman · Batman Forever", e:"✈️", a:false, d:2025, age:65, f:"Died in April 2025. His voice was recreated with AI for Top Gun: Maverick."},
+  {n:"Robert Redford", k:"Butch Cassidy · founded Sundance", e:"🤠", a:false, d:2025, age:89, f:"The Sundance Film Festival is named after his Butch Cassidy character."},
+  {n:"Diane Keaton", k:"Annie Hall · The Godfather", e:"🎩", a:false, d:2025, age:79, f:"Died in October 2025. La-di-da, la-di-da."},
+  {n:"George Foreman", k:"Heavyweight champ · the grill", e:"🥊", a:false, d:2025, age:76, f:"Died in March 2025. Named all five of his sons George."},
+  {n:"Loni Anderson", k:"WKRP in Cincinnati", e:"📻", a:false, d:2025, age:79, f:"Was married to Burt Reynolds for five years in the late 80s and early 90s."},
+  {n:"Richard Simmons", k:"Sweatin' to the Oldies", e:"🩳", a:false, d:2024, age:76, f:"Died in 2024, a decade after vanishing from public life."},
+  {n:"Shelley Duvall", k:"The Shining · Popeye's Olive Oyl", e:"🪓", a:false, d:2024, age:75, f:"Died in 2024, a year after her first film in decades."},
+  {n:"Bob Barker", k:"The Price Is Right", e:"💰", a:false, d:2023, age:99, f:"Died in 2023. Get your pets spayed or neutered."},
+  {n:"Tina Turner", k:"Simply the Best · What's Love Got to Do With It", e:"💃", a:false, d:2023, age:83, f:"Died in Switzerland in 2023, where she'd lived for decades."},
+  {n:"Paul Reubens", k:"Pee-wee Herman", e:"🚲", a:false, d:2023, age:70, f:"Died in 2023 after privately battling cancer for six years."},
+  {n:"Olivia Newton-John", k:"Grease · Physical", e:"🎀", a:false, d:2022, age:73, f:"Was made a Dame in 2020 for services to charity and entertainment."},
+  {n:"Meat Loaf", k:"Bat Out of Hell", e:"🏍️", a:false, d:2022, age:74, f:"Died in January 2022. He would do anything for love, but he wouldn't do that."},
+  {n:"Jerry Lee Lewis", k:"Great Balls of Fire", e:"🎹", a:false, d:2022, age:87, f:"TMZ wrongly reported his death in 2022. He actually died two days later."},
+  {n:"Betty White", k:"The Golden Girls", e:"👵", a:false, d:2021, age:99, f:"Died on 31 December 2021, 17 days before her 100th birthday."},
+  {n:"Sean Connery", k:"The original James Bond", e:"🍸", a:false, d:2020, age:90, f:"Died in 2020. Shaken, not stirred."},
+  {n:"Kirk Douglas", k:"Spartacus", e:"🗡️", a:false, d:2020, age:103, f:"Lived to 103. Son Michael is still going strong."},
+  {n:"Little Richard", k:"Tutti Frutti · Long Tall Sally", e:"🎤", a:false, d:2020, age:87, f:"Died in 2020. A-wop-bop-a-loo-bop."},
+  {n:"Burt Reynolds", k:"Smokey and the Bandit", e:"🥸", a:false, d:2018, age:82, f:"Died in 2018 before filming his part in Once Upon a Time in Hollywood."},
+  {n:"Gene Wilder", k:"Willy Wonka · Young Frankenstein", e:"🍫", a:false, d:2016, age:83, f:"Died in 2016. He'd kept his Alzheimer's private so kids wouldn't see Willy Wonka as ill."},
+  {n:"Abe Vigoda", k:"The Godfather's Tessio", e:"📰", a:false, d:2016, age:94, f:"People magazine called him 'the late Abe Vigoda' in 1982. He lived another 34 years."},
+  {n:"Zsa Zsa Gabor", k:"Famous for being famous, pre-Kardashian", e:"💎", a:false, d:2016, age:99, f:"Married nine times. Died in 2016, weeks before turning 100."},
+  {n:"Leslie Nielsen", k:"Airplane! · The Naked Gun", e:"🛩️", a:false, d:2010, age:84, f:"Died in 2010. Surely you can't be serious? He was, and don't call him Shirley."},
+  {n:"Patrick Swayze", k:"Dirty Dancing · Ghost", e:"🕺", a:false, d:2009, age:57, f:"Died in 2009. Nobody puts Baby in a corner."},
+  {n:"Bob Ross", k:"The Joy of Painting", e:"🎨", a:false, d:1995, age:52, f:"Died in 1995. Thanks to YouTube, a lot of people assume he's still painting happy little trees."},
+  {n:"Bruce Forsyth", k:"Strictly · The Generation Game", e:"🕴️", a:false, d:2017, age:89, f:"Died in 2017. Nice to see you, to see you nice."},
+  {n:"Paul Daniels", k:"Magician · 'You'll like this… not a lot'", e:"🎩", a:false, d:2016, age:77, f:"Married to the lovely Debbie McGee for 28 years."},
+  {n:"Keith Chegwin", k:"Swap Shop · Cheggers Plays Pop", e:"📺", a:false, d:2017, age:60, f:"Once hosted a nude game show, Naked Jungle. Channel 5, 1999. Yes, really."},
+  {n:"Barbara Windsor", k:"Carry On films · EastEnders' Peggy", e:"🍺", a:false, d:2020, age:83, f:"Died in 2020. Get outta my pub!"},
+  {n:"Cilla Black", k:"Blind Date · Surprise Surprise", e:"💌", a:false, d:2015, age:72, f:"Died in 2015. Lorra lorra laughs."},
+  {n:"Dustin Diamond", k:"Screech in Saved by the Bell", e:"📟", a:false, d:2021, age:44, f:"Died in 2021, younger than most people guess."},
+  {n:"Adam West", k:"TV's 1960s Batman", e:"🦇", a:false, d:2017, age:88, f:"Died in 2017. His Robin, Burt Ward, is still alive."},
+  {n:"Roger Moore", k:"James Bond · The Saint", e:"🤨", a:false, d:2017, age:89, f:"Died in 2017. Played Bond more times than anyone in the official series."},
+
+  // --- Alive ---
+  {n:"Dick Van Dyke", k:"Mary Poppins · Diagnosis: Murder", e:"☂️", a:true, b:1925, f:"Turned 100 in December 2025. Still dancing, still doing that accent."},
+  {n:"Mel Brooks", k:"Blazing Saddles · Spaceballs", e:"🌌", a:true, b:1926, f:"Turned 100 in June 2026. The 2000 Year Old Man is only 1,900 short."},
+  {n:"William Shatner", k:"Captain Kirk · T.J. Hooker", e:"🛸", a:true, b:1931, f:"Went to actual space in 2021, aged 90."},
+  {n:"Clint Eastwood", k:"Dirty Harry · The Good, the Bad and the Ugly", e:"🔫", a:true, b:1930, f:"Directed a film at 94. Do you feel lucky?"},
+  {n:"Willie Nelson", k:"On the Road Again", e:"🎸", a:true, b:1933, f:"One of the most death-hoaxed people on earth. Still on the road again."},
+  {n:"Rita Moreno", k:"West Side Story (the 1961 one)", e:"🌹", a:true, b:1931, f:"One of the few people with an EGOT: Emmy, Grammy, Oscar and Tony."},
+  {n:"Carol Burnett", k:"The Carol Burnett Show", e:"👂", a:true, b:1933, f:"Picked up an Emmy nomination in her 90s."},
+  {n:"Sophia Loren", k:"Italian screen goddess", e:"🍝", a:true, b:1934, f:"The first actor to win an Oscar for a non-English-language role, in 1962."},
+  {n:"Michael Caine", k:"The Italian Job · Alfie", e:"🚐", a:true, b:1933, f:"Retired from acting in 2023. You were only supposed to blow the bloody doors off!"},
+  {n:"Jack Nicholson", k:"The Shining · One Flew Over the Cuckoo's Nest", e:"🚪", a:true, b:1937, f:"Hasn't made a film since 2010, but still shows up courtside at Lakers games."},
+  {n:"Keith Richards", k:"The Rolling Stones", e:"🎸", a:true, b:1943, f:"Topped 'next rock star to die' lists for decades. Has outlived most of the people who made those lists."},
+  {n:"Cliff Richard", k:"Summer Holiday · Christmas No. 1s", e:"🎄", a:true, b:1940, f:"Still touring. Has had UK hits in every decade from the 1950s to the 2010s."},
+  {n:"Tom Jones", k:"It's Not Unusual · Sex Bomb", e:"🩲", a:true, b:1940, f:"In 2023, 'Tom Jones dies' trended. It was a different Tom Jones, the writer of the musical The Fantasticks."},
+  {n:"Joan Collins", k:"Dynasty's Alexis Carrington", e:"💄", a:true, b:1933, f:"Still glamorous, still acting, still married to a man 32 years her junior."},
+  {n:"Paul McCartney", k:"The Beatles", e:"🪲", a:true, b:1942, f:"The 'Paul is dead' conspiracy started in 1969. He's been not-dead ever since."},
+  {n:"Jerry Mathers", k:"Leave It to Beaver", e:"🦫", a:true, b:1948, f:"Newspapers wrongly reported he was killed in Vietnam in the late 60s."},
+  {n:"Mr. T", k:"The A-Team · Rocky III", e:"📿", a:true, b:1952, f:"I pity the fool who thought he was dead."},
+  {n:"Vanilla Ice", k:"Ice Ice Baby", e:"🧊", a:true, b:1967, f:"Spent years flipping houses on TV. Stop, collaborate and listen."},
+  {n:"MC Hammer", k:"U Can't Touch This", e:"🔨", a:true, b:1962, f:"Went from bankrupt to Silicon Valley tech investor. Can't touch him."},
+  {n:"Lee Majors", k:"The Six Million Dollar Man", e:"🦾", a:true, b:1939, f:"Still with us, and still technically better, stronger, faster."},
+  {n:"Burt Ward", k:"Robin in 1960s Batman", e:"🦸", a:true, b:1945, f:"Holy longevity, Batman! He got his Hollywood Walk of Fame star in 2020."},
+  {n:"Christopher Lloyd", k:"Doc Brown in Back to the Future", e:"⚡", a:true, b:1938, f:"Still working. Great Scott!"},
+  {n:"Jane Fonda", k:"Barbarella · 80s workout videos", e:"🏋️", a:true, b:1937, f:"Feel the burn. Still acting and still getting arrested at climate protests."},
+  {n:"Paul Hogan", k:"Crocodile Dundee", e:"🐊", a:true, b:1939, f:"That's not a knife… and he's not dead."},
+  {n:"Iggy Pop", k:"Lust for Life · The Stooges", e:"🦎", a:true, b:1947, f:"Spent the 70s doing things that should have killed him. Still shirtless, still touring."},
+  {n:"Noel Edmonds", k:"Deal or No Deal · House Party", e:"📦", a:true, b:1948, f:"Moved to New Zealand. Mr Blobby has not been confirmed either way."},
+  {n:"Ringo Starr", k:"The Beatles' drummer", e:"🥁", a:true, b:1940, f:"Peace and love! Still touring with his All-Starr Band."},
+  {n:"Bob Dylan", k:"Blowin' in the Wind", e:"🎶", a:true, b:1941, f:"Won the Nobel Prize for Literature in 2016 and took weeks to acknowledge it."},
+  {n:"Cher", k:"Believe · Moonstruck", e:"💫", a:true, b:1946, f:"Do you believe in life after… well, she's still alive."},
+  {n:"Jackie Chan", k:"Rush Hour · Police Story", e:"🪜", a:true, b:1954, f:"Has broken nearly every bone in his body doing his own stunts. Still alive."},
+  {n:"Danny DeVito", k:"Taxi · Twins", e:"🥚", a:true, b:1944, f:"Still terrorising Philadelphia on It's Always Sunny."},
+  {n:"Henry Winkler", k:"The Fonz in Happy Days", e:"👍", a:true, b:1945, f:"Ayyyy! He won his first Emmy in 2018, 44 years after Happy Days began."},
+  {n:"David Hasselhoff", k:"Knight Rider · Baywatch", e:"🏖️", a:true, b:1952, f:"Still huge in Germany."},
+  {n:"Erik Estrada", k:"Ponch in CHiPs", e:"🏍️", a:true, b:1949, f:"Became a real reserve police officer after playing one on TV."},
+  {n:"Leo Sayer", k:"You Make Me Feel Like Dancing", e:"🌀", a:true, b:1948, f:"Moved to Australia, curls intact."},
+  {n:"Shakin' Stevens", k:"Merry Christmas Everyone", e:"🎅", a:true, b:1948, f:"Gets an annual comeback every December."},
+  {n:"Macaulay Culkin", k:"Home Alone", e:"😱", a:true, b:1980, f:"A recurring internet death hoax target since 2014. Got his Walk of Fame star in 2023."},
+  {n:"Rick Astley", k:"Never Gonna Give You Up", e:"🎙️", a:true, b:1966, f:"Never gonna give you up. Never gonna die (so far)."},
+  {n:"Frank Bruno", k:"Boxing champ · panto star", e:"🥊", a:true, b:1961, f:"Know what I mean, 'Arry?"},
+  {n:"Timmy Mallett", k:"Wacaday · Itsy Bitsy", e:"🔨", a:true, b:1955, f:"Still has the mallet. Still has the glasses."},
+];
+
+/* ------------------------------------------------------------------ */
+const ROUND = 15;
+const $ = s => document.querySelector(s);
+const store = {
+  get(k){ try{ return localStorage.getItem(k) }catch(e){ return null } },
+  set(k,v){ try{ localStorage.setItem(k,v) }catch(e){} }
+};
+
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function hash(s){let h=2166136261;for(const c of s){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0}
+
+// Pick a balanced deck (roughly half/half, with some randomness) from a seed.
+function buildDeck(seed){
+  const r = mulberry32(seed);
+  const shuffle = arr => { arr=arr.slice(); for(let i=arr.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]]} return arr };
+  const dead = shuffle(PEOPLE.filter(p=>!p.a)), alive = shuffle(PEOPLE.filter(p=>p.a));
+  const nDead = 6 + Math.floor(r()*4); // 6–9 dead, so you can't just count
+  return shuffle(dead.slice(0,nDead).concat(alive.slice(0,ROUND-nDead)));
+}
+
+// ---- state
+let seed, deck, idx, answers, streak, best, busy=false, challenge=null;
+
+// ---- challenge link
+(function readChallenge(){
+  const q = new URLSearchParams(location.search);
+  const c = parseInt(q.get('c'),10), s = parseInt(q.get('s'),10);
+  if(Number.isFinite(c) && Number.isFinite(s)){
+    challenge = {seed:c>>>0, score:Math.max(0,Math.min(ROUND,s)), name:(q.get('n')||'').slice(0,20)};
+    const who = challenge.name ? escapeHtml(challenge.name) : 'Your friend';
+    $('#challenge').innerHTML = `⚔️ <b>${who}</b> scored <b>${challenge.score}/${ROUND}</b> on this exact deck. Can you beat them?`;
+    $('#challenge').classList.add('on');
+  }
+})();
+function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id))}
+
+function start(useChallenge){
+  seed = (useChallenge && challenge) ? challenge.seed : (Math.random()*2**32)>>>0;
+  if(!useChallenge) challenge = null;
+  deck = buildDeck(seed); idx = 0; answers = []; streak = 0; best = 0;
+  show('play'); renderCards(); updateHud();
+}
+
+function portraitBg(name){
+  const h = hash(name)%360;
+  return `linear-gradient(150deg, hsl(${h} 85% 72%), hsl(${(h+50)%360} 80% 58%))`;
+}
+function cardHTML(p, n){
+  return `<div class="portrait" style="background:${portraitBg(p.n)}"><span class="q">#${n}</span>${p.e}
+      <div class="stamp alive">ALIVE</div><div class="stamp dead">DEAD</div></div>
+    <div class="info"><h2>${p.n}</h2><p>${p.k}</p></div>`;
+}
+function renderCards(){
+  const d = $('#deck'); d.innerHTML='';
+  if(deck[idx+1]){const b=document.createElement('div');b.className='card back';b.innerHTML=cardHTML(deck[idx+1],idx+2);d.appendChild(b)}
+  const c=document.createElement('div');c.className='card';c.id='top';c.innerHTML=cardHTML(deck[idx],idx+1);d.appendChild(c);
+  attachDrag(c);
+}
+function updateHud(){
+  $('#count').textContent = `${Math.min(idx+1,ROUND)}/${ROUND}`;
+  $('#bar').style.width = (answers.length/ROUND*100)+'%';
+  $('#streak').textContent = `🔥 ${streak}`;
+}
+
+// ---- drag
+function attachDrag(card){
+  let x0=0,y0=0,dx=0,dy=0,drag=false;
+  const sa=card.querySelector('.stamp.alive'), sd=card.querySelector('.stamp.dead');
+  card.addEventListener('pointerdown',e=>{ if(busy) return; drag=true; x0=e.clientX; y0=e.clientY; dx=dy=0; card.classList.remove('snap'); card.setPointerCapture(e.pointerId) });
+  card.addEventListener('pointermove',e=>{
+    if(!drag) return; dx=e.clientX-x0; dy=e.clientY-y0;
+    card.style.transform=`translate(${dx}px,${dy*.3}px) rotate(${dx/14}deg)`;
+    const t=Math.min(Math.abs(dx)/110,1);
+    sa.style.opacity = dx>0?t:0; sd.style.opacity = dx<0?t:0;
+  });
+  const end=()=>{
+    if(!drag) return; drag=false;
+    if(Math.abs(dx)>100) answer(dx>0);
+    else { card.classList.add('snap'); card.style.transform=''; sa.style.opacity=sd.style.opacity=0 }
+  };
+  card.addEventListener('pointerup',end); card.addEventListener('pointercancel',end);
+}
+
+function answer(saidAlive){
+  if(busy || idx>=deck.length) return; busy=true;
+  const p=deck[idx], card=$('#top'), ok = saidAlive===p.a;
+  card.querySelector(saidAlive?'.stamp.alive':'.stamp.dead').style.opacity=1;
+  card.classList.add('fly'); card.style.transform=`translate(${saidAlive?'':'-'}140vw,40px) rotate(${saidAlive?30:-30}deg)`;
+  answers.push({p, saidAlive, ok});
+  streak = ok ? streak+1 : 0; best=Math.max(best,streak);
+  if(navigator.vibrate) try{navigator.vibrate(ok?20:[40,60,40])}catch(e){}
+  updateHud();
+  // reveal
+  const v=$('#verdict');
+  const right=['Correct!','Nailed it!','Spot on!','Psychic!','Yep!'], wrong=['Wrong!','Nope!','Oof.','Not quite!'];
+  const pick=a=>a[Math.floor(Math.random()*a.length)];
+  v.textContent = ok ? (streak>=3?`${pick(right)} 🔥${streak}`:pick(right)) : pick(wrong);
+  v.className='verdict '+(ok?'ok':'no');
+  $('#truth').innerHTML = p.a ? `💚 <b>${p.n}</b> is alive (born ${p.b}).` : `💀 <b>${p.n}</b> died in ${p.d}, aged ${p.age}.`;
+  $('#fact').textContent = p.f.replace(/^Died (in|on) [^.]*\.\s*/,'');
+  $('#nextBtn').textContent = idx+1>=ROUND ? 'See my score →' : 'Next →';
+  setTimeout(()=>$('#sheet').classList.add('on'),180);
+}
+function next(){
+  if(!busy) return;
+  $('#sheet').classList.remove('on'); idx++; busy=false;
+  if(idx>=ROUND) return finish();
+  renderCards(); updateHud();
+}
+
+// ---- end
+const RANKS = [
+  [15,"Grim Reaper's PA"],[13,"Certified Psychic Medium"],[10,"Obituary Enthusiast"],
+  [7,"Casual Mourner"],[4,"Still Living in 1987"],[0,"Thinks Elvis Is On Tour"]
+];
+const rankFor = s => RANKS.find(([m])=>s>=m)[1];
+const score = () => answers.filter(a=>a.ok).length;
+function shockLine(){
+  const w = answers.filter(a=>!a.ok);
+  if(!w.length) return `Didn't miss a single one 😎`;
+  const a = w.find(x=>!x.p.a) || w[0];
+  return a.p.a ? `I'd already sent flowers for ${a.p.n} 💐 (still alive!)`
+               : `Turns out ${a.p.n} died in ${a.p.d} 😬`;
+}
+const gridStr = () => answers.map(a=>a.ok?'🟩':'🟥').join('');
+
+function finish(){
+  const s=score();
+  $('#score').innerHTML = `${s}<small>/${ROUND}</small>`;
+  $('#rank').textContent = rankFor(s);
+  $('#grid').textContent = gridStr();
+  $('#shock').textContent = shockLine();
+  const vs=$('#vs');
+  if(challenge){
+    const who = challenge.name||'your friend';
+    vs.textContent = s>challenge.score ? `🏆 You beat ${who} (${challenge.score})!` : s===challenge.score ? `🤝 Tied with ${who}!` : `😵 ${who} wins (${challenge.score}). Rematch?`;
+  } else vs.textContent = best>=5 ? `Best streak: 🔥${best}` : '';
+  $('#review').innerHTML = answers.map(a=>`<li><span>${a.ok?'✅':'❌'}</span><b>${a.p.n}</b><span class="tag ${a.p.a?'alive':'dead'}">${a.p.a?'Alive':'Died '+a.p.d}</span></li>`).join('');
+  $('#name').value = store.get('doa-name')||'';
+  $('#bar').style.width='100%';
+  show('end'); window.scrollTo(0,0);
+}
+
+// ---- sharing
+function shareUrl(){
+  const name = $('#name').value.trim();
+  if(name) store.set('doa-name',name);
+  const u = new URL(location.href.split('?')[0].split('#')[0]);
+  u.searchParams.set('c',seed); u.searchParams.set('s',score());
+  if(name) u.searchParams.set('n',name);
+  return u.toString();
+}
+function shareText(){
+  const s=score();
+  let t = `💀 Are They Dead or Alive? 💚\nI got ${s}/${ROUND} — "${rankFor(s)}"\n${gridStr()}\n${shockLine()}`;
+  if(challenge) t += `\n(${challenge.name||'My friend'} got ${challenge.score} on this deck)`;
+  return t + `\nSame 15 stars. Can you beat me?`;
+}
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove('on'),2200)}
+async function copy(str){
+  try{ await navigator.clipboard.writeText(str); return true }catch(e){
+    const ta=document.createElement('textarea');ta.value=str;document.body.appendChild(ta);ta.select();
+    let ok=false; try{ok=document.execCommand('copy')}catch(_){}; ta.remove(); return ok;
+  }
+}
+
+async function makeCard(){
+  await (document.fonts?.ready||Promise.resolve());
+  const W=1080,H=1350,c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');
+  const F='"Bricolage Grotesque", system-ui, sans-serif';
+  const s=score();
+  g.fillStyle='#f6f0e4';g.fillRect(0,0,W,H);
+  // border card
+  g.fillStyle='#1a1714';roundRect(g,74,74,W-140,H-140,48);g.fill();
+  g.fillStyle='#fffaf0';roundRect(g,60,60,W-140,H-140,48);g.fill();
+  g.lineWidth=8;g.strokeStyle='#1a1714';roundRect(g,60,60,W-140,H-140,48);g.stroke();
+  g.textAlign='center';
+  g.fillStyle='#6b6258';g.font=`600 46px ${F}`;g.fillText('ARE THEY',W/2-10,180);
+  g.font=`800 112px ${F}`;
+  const t1='Dead',t2=' or ',t3='Alive?';
+  const w1=g.measureText(t1).width,w2=g.measureText(t2).width,w3=g.measureText(t3).width;
+  let x=W/2-10-(w1+w2+w3)/2; g.textAlign='left';
+  g.fillStyle='#d23b2e';g.fillText(t1,x,300);x+=w1;g.fillStyle='#1a1714';g.fillText(t2,x,300);x+=w2;g.fillStyle='#17905a';g.fillText(t3,x,300);
+  g.textAlign='center';g.fillStyle='#1a1714';
+  g.font=`800 300px ${F}`;const sw=g.measureText(String(s)).width;
+  g.font=`800 110px ${F}`;const dw=g.measureText('/'+ROUND).width;
+  let sx=W/2-10-(sw+dw+10)/2;g.textAlign='left';
+  g.font=`800 300px ${F}`;g.fillText(String(s),sx,620);
+  g.font=`800 110px ${F}`;g.fillStyle='#6b6258';g.fillText('/'+ROUND,sx+sw+10,620);g.textAlign='center';
+  // rank badge
+  g.save();g.translate(W/2-10,720);g.rotate(-.03);
+  g.font=`800 56px ${F}`;const rk=rankFor(s),rw=g.measureText(rk).width+70;
+  g.fillStyle='#1a1714';roundRect(g,-rw/2+8,-58,rw,100,20);g.fill();
+  g.fillStyle='#f2b705';roundRect(g,-rw/2,-66,rw,100,20);g.fill();
+  g.lineWidth=6;g.strokeStyle='#1a1714';roundRect(g,-rw/2,-66,rw,100,20);g.stroke();
+  g.fillStyle='#1a1714';g.fillText(rk,0,2);g.restore();
+  // grid of dots
+  const r=26,gap=16,tot=ROUND*(2*r)+(ROUND-1)*gap,scale=Math.min(1,(W-260)/tot);
+  const rr=r*scale,gg=gap*scale; let gx=W/2-10-(ROUND*2*rr+(ROUND-1)*gg)/2+rr;
+  answers.forEach(a=>{g.beginPath();g.arc(gx,860,rr,0,Math.PI*2);g.fillStyle=a.ok?'#17905a':'#d23b2e';g.fill();gx+=2*rr+gg});
+  // shock line
+  g.fillStyle='#1a1714';g.font=`600 40px ${F}`;
+  wrap(g,shockLine().replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu,'').trim(),W/2-10,980,W-280,52);
+  g.fillStyle='#6b6258';g.font=`600 36px ${F}`;
+  g.fillText(challenge?`vs ${challenge.name||'friend'}: ${challenge.score}/${ROUND}`:'Think you can beat me?',W/2-10,1140);
+  g.font=`800 40px ${F}`;g.fillStyle='#d23b2e';g.fillText('💀  Swipe to play  💚',W/2-10,1210);
+  return new Promise(res=>c.toBlob(res,'image/png'));
+}
+function roundRect(g,x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath()}
+function wrap(g,text,x,y,max,lh){const words=text.split(' ');let line='';for(const w of words){const t=line?line+' '+w:w;if(g.measureText(t).width>max&&line){g.fillText(line,x,y);line=w;y+=lh}else line=t}g.fillText(line,x,y)}
+
+async function shareMain(){
+  const url=shareUrl(), text=shareText();
+  try{
+    const blob=await makeCard();
+    const file=new File([blob],'dead-or-alive-score.png',{type:'image/png'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file],text:text+'\n'+url}); return;
+    }
+    if(navigator.share){ await navigator.share({text,url}); return }
+  }catch(e){ if(e && e.name==='AbortError') return }
+  if(await copy(text+'\n'+url)) toast('Copied! Paste it to your group chat 📋'); else toast('Couldn\'t share, try Copy link');
+}
+async function saveImage(){
+  const blob=await makeCard(), a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download='dead-or-alive-score.png'; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000); toast('Score card saved 🖼️');
+}
+
+// ---- wiring
+$('#playBtn').onclick=()=>start(!!challenge);
+$('#deadBtn').onclick=()=>answer(false);
+$('#aliveBtn').onclick=()=>answer(true);
+$('#nextBtn').onclick=next;
+$('#againBtn').onclick=()=>{history.replaceState(null,'',location.pathname);$('#challenge').classList.remove('on');start(false)};
+$('#shareBtn').onclick=shareMain;
+$('#imgBtn').onclick=saveImage;
+$('#copyBtn').onclick=async()=>{ toast(await copy(shareText()+'\n'+shareUrl())?'Copied! 📋':'Copy failed') };
+$('#waBtn').onclick=()=>window.open('https://wa.me/?text='+encodeURIComponent(shareText()+'\n'+shareUrl()),'_blank','noopener');
+document.addEventListener('keydown',e=>{
+  if(!$('#play').classList.contains('on')) return;
+  if($('#sheet').classList.contains('on')){ if(['Enter',' ','ArrowRight','ArrowLeft'].includes(e.key)){e.preventDefault();next()} return }
+  if(e.key==='ArrowLeft') answer(false); else if(e.key==='ArrowRight') answer(true);
+});
+</script>
+</body>
+</html>
