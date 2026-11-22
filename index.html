@@ -86,7 +86,12 @@ button{font:inherit;color:inherit;cursor:pointer}
 .card.fly{transition:transform .38s cubic-bezier(.4,.1,.6,1), opacity .38s}
 .card.snap{transition:transform .25s cubic-bezier(.2,1.4,.4,1)}
 .portrait{flex:1;display:grid;place-items:center;font-size:clamp(110px,34vw,150px);position:relative;border-bottom:3px solid var(--line)}
-.portrait .q{position:absolute;top:12px;left:14px;font-size:14px;font-weight:800;background:var(--card);color:var(--ink);border:2px solid var(--line);border-radius:99px;padding:4px 10px}
+.portrait .q,.portrait .cat{position:absolute;top:12px;left:14px;z-index:2;font-size:14px;font-weight:800;background:var(--card);color:var(--ink);border:2px solid var(--line);border-radius:99px;padding:4px 10px}
+.portrait .cat{left:auto;right:14px}
+.portrait img{position:absolute;inset:0;z-index:1;width:100%;height:100%;object-fit:cover;object-position:50% 22%;opacity:0;transition:opacity .35s;pointer-events:none;-webkit-user-drag:none}
+.portrait img.ok{opacity:1}
+.portrait .emo{position:relative;z-index:0}
+.portrait .stamp{z-index:3}
 .info{padding:16px 18px 20px}
 .info h2{margin:0;font-size:clamp(28px,8vw,36px);line-height:1;letter-spacing:-.02em}
 .info p{margin:8px 0 0;color:var(--muted);font-weight:600;font-size:16px}
@@ -114,6 +119,8 @@ button{font:inherit;color:inherit;cursor:pointer}
 .truth{font-size:18px;font-weight:600;margin:6px 0 0}
 .fact{font-size:15px;color:var(--muted);margin:8px 0 14px;line-height:1.35}
 .sheet .btn{width:100%}
+.credit{font-size:11px;color:var(--muted);margin:-8px 0 12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.credit a{color:inherit}
 
 /* ---------- end ---------- */
 .result{text-align:center;display:flex;flex-direction:column;gap:14px;padding-top:8px}
@@ -150,7 +157,7 @@ button{font:inherit;color:inherit;cursor:pointer}
         <div class="r"><b>Alive →</b>Swipe right if they're still kicking</div>
       </div>
       <button class="btn primary" id="playBtn">Let's find out</button>
-      <p class="fine">15 stars per round. Facts checked November 2026.</p>
+      <p class="fine">15 famous faces per round: film, TV, music, politics, sport and more. Facts checked November 2026. Photos from Wikipedia.</p>
     </div>
   </section>
 
@@ -192,7 +199,7 @@ button{font:inherit;color:inherit;cursor:pointer}
         <ol id="review"></ol>
       </details>
       <button class="btn" id="againBtn">Play again (new stars)</button>
-      <p class="fine">Facts checked November 2026. Celebrities, inconveniently, keep changing status.</p>
+      <p class="fine">Facts checked November 2026. Celebrities, inconveniently, keep changing status. Photos from Wikipedia / Wikimedia Commons.</p>
     </div>
   </section>
 </div>
@@ -202,6 +209,7 @@ button{font:inherit;color:inherit;cursor:pointer}
     <p class="verdict" id="verdict"></p>
     <p class="truth" id="truth"></p>
     <p class="fact" id="fact"></p>
+    <p class="credit" id="credit"></p>
     <button class="btn primary" id="nextBtn">Next →</button>
   </div>
 </div>
@@ -209,95 +217,146 @@ button{font:inherit;color:inherit;cursor:pointer}
 
 <script>
 /* ------------------------------------------------------------------
-   DATA — status as of November 2026.
+   DATA — status checked November 2026.
    a: true = alive. b = birth year. d = death year, age = age at death.
+   c: category. w: Wikipedia page title, if it differs from the name (used for the photo).
+   Pitched at people in their 30s/40s (UK and US).
    To add someone, append to the END of the list (keeps old challenge links valid).
 ------------------------------------------------------------------- */
+const CATS = {film:"🎬 Film", tv:"📺 TV", music:"🎵 Music", politics:"🏛️ Politics", sport:"🏅 Sport", science:"🔬 Science & nature", royal:"👑 Royalty & religion", misc:"⭐ Famous for… things"};
 const PEOPLE = [
-  // --- Dead ---
-  {n:"Chuck Norris", k:"Walker, Texas Ranger · the internet's hardest man", e:"🥋", a:false, d:2026, age:86, f:"Posted a sparring video for his 86th birthday just nine days before he died in March 2026."},
-  {n:"Dolly Parton", k:"9 to 5 · Jolene · Dollywood", e:"🦋", a:false, d:2026, age:80, f:"Died in August 2026. Her Imagination Library has given away well over 200 million free books to kids."},
-  {n:"Patrick Stewart", k:"Captain Picard · Professor X", e:"🖖", a:false, d:2026, age:86, f:"Died in October 2026. Make it so."},
-  {n:"Robert Duvall", k:"The Godfather · Apocalypse Now", e:"🚁", a:false, d:2026, age:95, f:"Died in February 2026. He loved the smell of napalm in the morning."},
-  {n:"Eva Marie Saint", k:"On the Waterfront · North by Northwest", e:"🎞️", a:false, d:2026, age:102, f:"Died in October 2026 at 102, one of the last stars of Hollywood's golden age."},
-  {n:"Walter Koenig", k:"Chekov in Star Trek", e:"🚀", a:false, d:2026, age:90, f:"Died in October 2026. His captain, William Shatner, outlived him."},
-  {n:"Hulk Hogan", k:"Hulkamania · 80s WWF icon", e:"💪", a:false, d:2025, age:71, f:"Died in July 2025, brother."},
-  {n:"Ozzy Osbourne", k:"Black Sabbath · The Osbournes", e:"🦇", a:false, d:2025, age:76, f:"Played a farewell show in Birmingham in July 2025 and died just 17 days later."},
-  {n:"Gene Hackman", k:"The French Connection · Superman's Lex Luthor", e:"🕵️", a:false, d:2025, age:95, f:"Died in early 2025 after more than 20 years of quiet retirement in Santa Fe."},
-  {n:"Val Kilmer", k:"Top Gun's Iceman · Batman Forever", e:"✈️", a:false, d:2025, age:65, f:"Died in April 2025. His voice was recreated with AI for Top Gun: Maverick."},
-  {n:"Robert Redford", k:"Butch Cassidy · founded Sundance", e:"🤠", a:false, d:2025, age:89, f:"The Sundance Film Festival is named after his Butch Cassidy character."},
-  {n:"Diane Keaton", k:"Annie Hall · The Godfather", e:"🎩", a:false, d:2025, age:79, f:"Died in October 2025. La-di-da, la-di-da."},
-  {n:"George Foreman", k:"Heavyweight champ · the grill", e:"🥊", a:false, d:2025, age:76, f:"Died in March 2025. Named all five of his sons George."},
-  {n:"Loni Anderson", k:"WKRP in Cincinnati", e:"📻", a:false, d:2025, age:79, f:"Was married to Burt Reynolds for five years in the late 80s and early 90s."},
-  {n:"Richard Simmons", k:"Sweatin' to the Oldies", e:"🩳", a:false, d:2024, age:76, f:"Died in 2024, a decade after vanishing from public life."},
-  {n:"Shelley Duvall", k:"The Shining · Popeye's Olive Oyl", e:"🪓", a:false, d:2024, age:75, f:"Died in 2024, a year after her first film in decades."},
-  {n:"Bob Barker", k:"The Price Is Right", e:"💰", a:false, d:2023, age:99, f:"Died in 2023. Get your pets spayed or neutered."},
-  {n:"Tina Turner", k:"Simply the Best · What's Love Got to Do With It", e:"💃", a:false, d:2023, age:83, f:"Died in Switzerland in 2023, where she'd lived for decades."},
-  {n:"Paul Reubens", k:"Pee-wee Herman", e:"🚲", a:false, d:2023, age:70, f:"Died in 2023 after privately battling cancer for six years."},
-  {n:"Olivia Newton-John", k:"Grease · Physical", e:"🎀", a:false, d:2022, age:73, f:"Was made a Dame in 2020 for services to charity and entertainment."},
-  {n:"Meat Loaf", k:"Bat Out of Hell", e:"🏍️", a:false, d:2022, age:74, f:"Died in January 2022. He would do anything for love, but he wouldn't do that."},
-  {n:"Jerry Lee Lewis", k:"Great Balls of Fire", e:"🎹", a:false, d:2022, age:87, f:"TMZ wrongly reported his death in 2022. He actually died two days later."},
-  {n:"Betty White", k:"The Golden Girls", e:"👵", a:false, d:2021, age:99, f:"Died on 31 December 2021, 17 days before her 100th birthday."},
-  {n:"Sean Connery", k:"The original James Bond", e:"🍸", a:false, d:2020, age:90, f:"Died in 2020. Shaken, not stirred."},
-  {n:"Kirk Douglas", k:"Spartacus", e:"🗡️", a:false, d:2020, age:103, f:"Lived to 103. Son Michael is still going strong."},
-  {n:"Little Richard", k:"Tutti Frutti · Long Tall Sally", e:"🎤", a:false, d:2020, age:87, f:"Died in 2020. A-wop-bop-a-loo-bop."},
-  {n:"Burt Reynolds", k:"Smokey and the Bandit", e:"🥸", a:false, d:2018, age:82, f:"Died in 2018 before filming his part in Once Upon a Time in Hollywood."},
-  {n:"Gene Wilder", k:"Willy Wonka · Young Frankenstein", e:"🍫", a:false, d:2016, age:83, f:"Died in 2016. He'd kept his Alzheimer's private so kids wouldn't see Willy Wonka as ill."},
-  {n:"Abe Vigoda", k:"The Godfather's Tessio", e:"📰", a:false, d:2016, age:94, f:"People magazine called him 'the late Abe Vigoda' in 1982. He lived another 34 years."},
-  {n:"Zsa Zsa Gabor", k:"Famous for being famous, pre-Kardashian", e:"💎", a:false, d:2016, age:99, f:"Married nine times. Died in 2016, weeks before turning 100."},
-  {n:"Leslie Nielsen", k:"Airplane! · The Naked Gun", e:"🛩️", a:false, d:2010, age:84, f:"Died in 2010. Surely you can't be serious? He was, and don't call him Shirley."},
-  {n:"Patrick Swayze", k:"Dirty Dancing · Ghost", e:"🕺", a:false, d:2009, age:57, f:"Died in 2009. Nobody puts Baby in a corner."},
-  {n:"Bob Ross", k:"The Joy of Painting", e:"🎨", a:false, d:1995, age:52, f:"Died in 1995. Thanks to YouTube, a lot of people assume he's still painting happy little trees."},
-  {n:"Bruce Forsyth", k:"Strictly · The Generation Game", e:"🕴️", a:false, d:2017, age:89, f:"Died in 2017. Nice to see you, to see you nice."},
-  {n:"Paul Daniels", k:"Magician · 'You'll like this… not a lot'", e:"🎩", a:false, d:2016, age:77, f:"Married to the lovely Debbie McGee for 28 years."},
-  {n:"Keith Chegwin", k:"Swap Shop · Cheggers Plays Pop", e:"📺", a:false, d:2017, age:60, f:"Once hosted a nude game show, Naked Jungle. Channel 5, 1999. Yes, really."},
-  {n:"Barbara Windsor", k:"Carry On films · EastEnders' Peggy", e:"🍺", a:false, d:2020, age:83, f:"Died in 2020. Get outta my pub!"},
-  {n:"Cilla Black", k:"Blind Date · Surprise Surprise", e:"💌", a:false, d:2015, age:72, f:"Died in 2015. Lorra lorra laughs."},
-  {n:"Dustin Diamond", k:"Screech in Saved by the Bell", e:"📟", a:false, d:2021, age:44, f:"Died in 2021, younger than most people guess."},
-  {n:"Adam West", k:"TV's 1960s Batman", e:"🦇", a:false, d:2017, age:88, f:"Died in 2017. His Robin, Burt Ward, is still alive."},
-  {n:"Roger Moore", k:"James Bond · The Saint", e:"🤨", a:false, d:2017, age:89, f:"Died in 2017. Played Bond more times than anyone in the official series."},
+  // ===== Film & TV: dead =====
+  {n:"Chuck Norris", c:"film", k:"Walker, Texas Ranger · the internet's hardest man", e:"🥋", a:false, d:2026, age:86, f:"Posted a sparring video for his 86th birthday just nine days before he died in March 2026."},
+  {n:"Patrick Stewart", c:"film", k:"Captain Picard · Professor X", e:"🖖", a:false, d:2026, age:86, f:"Died in October 2026. Make it so."},
+  {n:"Robert Duvall", c:"film", k:"The Godfather · Apocalypse Now", e:"🚁", a:false, d:2026, age:95, f:"Died in February 2026. He loved the smell of napalm in the morning."},
+  {n:"Hulk Hogan", c:"tv", k:"Hulkamania · 80s WWF icon", e:"💪", a:false, d:2025, age:71, f:"Died in July 2025, brother."},
+  {n:"Gene Hackman", c:"film", k:"The French Connection · Superman's Lex Luthor", e:"🕵️", a:false, d:2025, age:95, f:"Died in early 2025 after more than 20 years of quiet retirement in Santa Fe."},
+  {n:"Val Kilmer", c:"film", k:"Top Gun's Iceman · Batman Forever", e:"✈️", a:false, d:2025, age:65, f:"Died in April 2025. His voice was recreated with AI for Top Gun: Maverick."},
+  {n:"Robert Redford", c:"film", k:"Butch Cassidy · founded Sundance", e:"🤠", a:false, d:2025, age:89, f:"The Sundance Film Festival is named after his Butch Cassidy character."},
+  {n:"Diane Keaton", c:"film", k:"Annie Hall · Father of the Bride", e:"🎩", a:false, d:2025, age:79, f:"Died in October 2025. La-di-da, la-di-da."},
+  {n:"Richard Simmons", c:"tv", k:"Sweatin' to the Oldies", e:"🩳", a:false, d:2024, age:76, f:"Died in 2024, a decade after vanishing from public life."},
+  {n:"Shelley Duvall", c:"film", k:"The Shining · Popeye's Olive Oyl", e:"🪓", a:false, d:2024, age:75, f:"Died in 2024, a year after her first film in decades."},
+  {n:"Paul Reubens", c:"tv", k:"Pee-wee Herman", e:"🚲", a:false, d:2023, age:70, f:"Died in 2023 after privately battling cancer for six years."},
+  {n:"Betty White", c:"tv", k:"The Golden Girls", e:"👵", a:false, d:2021, age:99, f:"Died on 31 December 2021, 17 days before her 100th birthday."},
+  {n:"Sean Connery", c:"film", k:"The original James Bond", e:"🍸", a:false, d:2020, age:90, f:"Died in 2020. Shaken, not stirred."},
+  {n:"Kirk Douglas", c:"film", k:"Spartacus · Michael Douglas's dad", e:"🗡️", a:false, d:2020, age:103, f:"Lived to 103."},
+  {n:"Burt Reynolds", c:"film", k:"Smokey and the Bandit · Boogie Nights", e:"🥸", a:false, d:2018, age:82, f:"Died in 2018 before filming his part in Once Upon a Time in Hollywood."},
+  {n:"Gene Wilder", c:"film", k:"Willy Wonka · Young Frankenstein", e:"🍫", a:false, d:2016, age:83, f:"He'd kept his Alzheimer's private so kids wouldn't see Willy Wonka as ill."},
+  {n:"Leslie Nielsen", c:"film", k:"Airplane! · The Naked Gun", e:"🛩️", a:false, d:2010, age:84, f:"Died in 2010. And don't call him Shirley."},
+  {n:"Patrick Swayze", c:"film", k:"Dirty Dancing · Ghost", e:"🕺", a:false, d:2009, age:57, f:"Died in 2009. Nobody puts Baby in a corner."},
+  {n:"Bob Ross", c:"tv", k:"The Joy of Painting", e:"🎨", a:false, d:1995, age:52, f:"Died in 1995. Thanks to YouTube, a lot of people assume he's still painting happy little trees."},
+  {n:"Bruce Forsyth", c:"tv", k:"Strictly · The Generation Game", e:"🕴️", a:false, d:2017, age:89, f:"Died in 2017. Nice to see you, to see you nice."},
+  {n:"Paul Daniels", c:"tv", k:"Magician · 'You'll like this… not a lot'", e:"🎩", a:false, d:2016, age:77, f:"Married to the lovely Debbie McGee for 28 years."},
+  {n:"Keith Chegwin", c:"tv", k:"Swap Shop · Cheggers Plays Pop", e:"📺", a:false, d:2017, age:60, f:"Once hosted a nude game show, Naked Jungle. Channel 5, 1999. Yes, really."},
+  {n:"Barbara Windsor", c:"tv", k:"Carry On films · EastEnders' Peggy", e:"🍺", a:false, d:2020, age:83, f:"Died in 2020. Get outta my pub!"},
+  {n:"Cilla Black", c:"tv", k:"Blind Date · Surprise Surprise", e:"💌", a:false, d:2015, age:72, f:"Died in 2015. Lorra lorra laughs."},
+  {n:"Jeremy Beadle", c:"tv", k:"Beadle's About · You've Been Framed", e:"🎭", a:false, d:2008, age:59, f:"Died in 2008. The nation's most-dreaded prankster."},
+  {n:"Dustin Diamond", c:"tv", k:"Screech in Saved by the Bell", e:"📟", a:false, d:2021, age:44, f:"Died in 2021, younger than most people guess."},
+  {n:"Adam West", c:"tv", k:"TV's 1960s Batman · Family Guy's Mayor West", e:"🦇", a:false, d:2017, age:88, f:"Died in 2017, still voicing Mayor Adam West in Family Guy."},
+  {n:"Roger Moore", c:"film", k:"James Bond · The Saint", e:"🤨", a:false, d:2017, age:89, f:"Died in 2017. Made more official Bond films than anyone."},
+  {n:"Larry King", c:"tv", k:"Larry King Live · the braces", e:"🎙️", a:false, d:2021, age:87, f:"Married eight times, to seven different women."},
+  {n:"Jerry Springer", c:"tv", k:"The Jerry Springer Show", e:"🪑", a:false, d:2023, age:79, f:"Before the chair-throwing, he was mayor of Cincinnati."},
+  {n:"Keith Floyd", c:"tv", k:"TV chef with a glass of wine in hand", e:"🍷", a:false, d:2009, age:65, f:"Pioneered the cookery show filmed on location, usually with a large glass of wine on the go."},
+  {n:"Stan Lee", c:"film", k:"Marvel Comics · every Marvel cameo", e:"🕷️", a:false, d:2018, age:95, f:"Died in 2018 but kept turning up in Marvel films he'd already filmed cameos for."},
+  // ===== Music: dead =====
+  {n:"Dolly Parton", c:"music", k:"9 to 5 · Jolene · Dollywood", e:"🦋", a:false, d:2026, age:80, f:"Died in August 2026. Her Imagination Library has given away well over 200 million free books to kids."},
+  {n:"Ozzy Osbourne", c:"music", k:"Black Sabbath · The Osbournes", e:"🦇", a:false, d:2025, age:76, f:"Played a farewell show in Birmingham in July 2025 and died just 17 days later."},
+  {n:"Tina Turner", c:"music", k:"Simply the Best · What's Love Got to Do With It", e:"💃", a:false, d:2023, age:83, f:"Died in Switzerland in 2023, where she'd lived for decades."},
+  {n:"Olivia Newton-John", c:"music", k:"Grease · Physical", e:"🎀", a:false, d:2022, age:73, f:"Was made a Dame in 2020 for services to charity and entertainment."},
+  {n:"Meat Loaf", c:"music", k:"Bat Out of Hell", e:"🏍️", a:false, d:2022, age:74, f:"Died in January 2022. He would do anything for love, but he wouldn't do that."},
+  {n:"Jerry Lee Lewis", c:"music", k:"Great Balls of Fire", e:"🎹", a:false, d:2022, age:87, f:"TMZ wrongly reported his death in 2022. He actually died two days later."},
+  {n:"Little Richard", c:"music", k:"Tutti Frutti · Long Tall Sally", e:"🎤", a:false, d:2020, age:87, f:"Died in 2020. A-wop-bop-a-loo-bop."},
+  // ===== Politics: dead =====
+  {n:"Margaret Thatcher", c:"politics", k:"UK Prime Minister 1979–90", e:"👜", a:false, d:2013, age:87, f:"The week she died, 'Ding Dong! The Witch Is Dead' reached No. 2 in the UK charts."},
+  {n:"Mikhail Gorbachev", c:"politics", k:"Last leader of the Soviet Union", e:"🧱", a:false, d:2022, age:91, f:"Starred in a Pizza Hut advert in 1997."},
+  {n:"Jimmy Carter", c:"politics", k:"US President 1977–81 · peanut farmer", e:"🥜", a:false, d:2024, age:100, f:"The first US president to reach 100. Died in December 2024."},
+  {n:"Henry Kissinger", c:"politics", k:"Nixon's Secretary of State", e:"🌐", a:false, d:2023, age:100, f:"Was still flying to Beijing to meet Xi Jinping at 100, months before he died."},
+  {n:"John Prescott", c:"politics", k:"Tony Blair's Deputy PM · two Jags", e:"🥚", a:false, d:2024, age:86, f:"Punched an egg-thrower live on the news during the 2001 election campaign."},
+  {n:"Nelson Mandela", c:"politics", k:"South Africa's first Black president", e:"✊", a:false, d:2013, age:95, f:"Was technically on a US terrorism watch list until 2008."},
+  {n:"Fidel Castro", c:"politics", k:"Cuba's revolutionary leader", e:"🚬", a:false, d:2016, age:90, f:"Cuba claims he survived over 600 assassination plots, including exploding cigars."},
+  {n:"Silvio Berlusconi", c:"politics", k:"Italian PM · 'bunga bunga'", e:"🍝", a:false, d:2023, age:86, f:"Led four Italian governments and owned AC Milan."},
+  {n:"Dick Cheney", c:"politics", k:"George W. Bush's Vice President", e:"🦆", a:false, d:2025, age:84, f:"Accidentally shot a friend in the face while quail hunting in 2006. Died in November 2025."},
+  {n:"Norman Tebbit", c:"politics", k:"Thatcher's enforcer · 'get on yer bike'", e:"🚴", a:false, d:2025, age:94, f:"Spitting Image played him as a leather-jacketed bovver boy. Died in July 2025."},
+  // ===== Royalty & religion: dead =====
+  {n:"Queen Elizabeth II", w:"Elizabeth II", c:"royal", k:"Queen for 70 years", e:"👑", a:false, d:2022, age:96, f:"Two days before she died, she appointed Liz Truss as Prime Minister."},
+  {n:"Prince Philip", w:"Prince Philip, Duke of Edinburgh", c:"royal", k:"The Duke of Edinburgh · gaffes", e:"🎖️", a:false, d:2021, age:99, f:"Died two months short of his 100th birthday."},
+  {n:"Pope Francis", c:"royal", k:"The first Latin American pope", e:"⛪", a:false, d:2025, age:88, f:"Died in April 2025, the day after Easter Sunday."},
+  {n:"Desmond Tutu", c:"royal", k:"Archbishop · anti-apartheid hero", e:"🕊️", a:false, d:2021, age:90, f:"Won the Nobel Peace Prize in 1984."},
+  // ===== Sport: dead =====
+  {n:"Muhammad Ali", c:"sport", k:"The Greatest", e:"🥊", a:false, d:2016, age:74, f:"Lit the Olympic cauldron at Atlanta 1996."},
+  {n:"Pelé", c:"sport", k:"Brazil's football king", e:"⚽", a:false, d:2022, age:82, f:"The only player to win three World Cups."},
+  {n:"Diego Maradona", c:"sport", k:"The Hand of God", e:"🤚", a:false, d:2020, age:60, f:"Died in 2020, aged just 60."},
+  {n:"Bobby Charlton", c:"sport", k:"1966 World Cup winner · Man Utd legend", e:"🏆", a:false, d:2023, age:86, f:"Survived the 1958 Munich air disaster."},
+  {n:"Sven-Göran Eriksson", c:"sport", k:"England manager 2001–06", e:"🇸🇪", a:false, d:2024, age:76, f:"Died in 2024, months after a farewell tour of his old clubs."},
+  {n:"Shane Warne", c:"sport", k:"Australian spin bowler", e:"🏏", a:false, d:2022, age:52, f:"Bowled the 'Ball of the Century' to Mike Gatting in 1993."},
+  {n:"George Best", c:"sport", k:"Man Utd & Northern Ireland genius", e:"🍾", a:false, d:2005, age:59, f:"'I spent a lot of money on booze, birds and fast cars. The rest I just squandered.'"},
+  {n:"Murray Walker", c:"sport", k:"The voice of Formula 1", e:"🏎️", a:false, d:2021, age:97, f:"Died in 2021 at 97. Unless I'm very much mistaken…"},
+  {n:"Evel Knievel", c:"sport", k:"Daredevil motorcycle jumper", e:"🏍️", a:false, d:2007, age:69, f:"Held the Guinness record for most broken bones in a lifetime."},
+  // ===== Science, nature & other: dead =====
+  {n:"Stephen Hawking", c:"science", k:"A Brief History of Time", e:"🌌", a:false, d:2018, age:76, f:"Lived more than 50 years after his ALS diagnosis. Died on Einstein's birthday."},
+  {n:"Neil Armstrong", c:"science", k:"First man on the Moon", e:"🌕", a:false, d:2012, age:82, f:"Died in 2012. His Apollo 11 crewmate Buzz Aldrin is still going."},
+  {n:"Jane Goodall", c:"science", k:"Chimpanzee researcher", e:"🐒", a:false, d:2025, age:91, f:"Died in October 2025, still on a speaking tour at 91."},
+  {n:"Patrick Moore", c:"science", k:"The Sky at Night · the monocle", e:"🔭", a:false, d:2012, age:89, f:"Presented The Sky at Night for 55 years."},
+  {n:"Steve Jobs", c:"misc", k:"Apple · 'one more thing'", e:"🍏", a:false, d:2011, age:56, f:"Died in 2011, the day after the iPhone 4S was announced."},
+  {n:"Hugh Hefner", c:"misc", k:"Playboy · the dressing gown", e:"🐰", a:false, d:2017, age:91, f:"Buried in the crypt next to Marilyn Monroe, which he'd bought in 1992."},
 
-  // --- Alive ---
-  {n:"Dick Van Dyke", k:"Mary Poppins · Diagnosis: Murder", e:"☂️", a:true, b:1925, f:"Turned 100 in December 2025. Still dancing, still doing that accent."},
-  {n:"Mel Brooks", k:"Blazing Saddles · Spaceballs", e:"🌌", a:true, b:1926, f:"Turned 100 in June 2026. The 2000 Year Old Man is only 1,900 short."},
-  {n:"William Shatner", k:"Captain Kirk · T.J. Hooker", e:"🛸", a:true, b:1931, f:"Went to actual space in 2021, aged 90."},
-  {n:"Clint Eastwood", k:"Dirty Harry · The Good, the Bad and the Ugly", e:"🔫", a:true, b:1930, f:"Directed a film at 94. Do you feel lucky?"},
-  {n:"Willie Nelson", k:"On the Road Again", e:"🎸", a:true, b:1933, f:"One of the most death-hoaxed people on earth. Still on the road again."},
-  {n:"Rita Moreno", k:"West Side Story (the 1961 one)", e:"🌹", a:true, b:1931, f:"One of the few people with an EGOT: Emmy, Grammy, Oscar and Tony."},
-  {n:"Carol Burnett", k:"The Carol Burnett Show", e:"👂", a:true, b:1933, f:"Picked up an Emmy nomination in her 90s."},
-  {n:"Sophia Loren", k:"Italian screen goddess", e:"🍝", a:true, b:1934, f:"The first actor to win an Oscar for a non-English-language role, in 1962."},
-  {n:"Michael Caine", k:"The Italian Job · Alfie", e:"🚐", a:true, b:1933, f:"Retired from acting in 2023. You were only supposed to blow the bloody doors off!"},
-  {n:"Jack Nicholson", k:"The Shining · One Flew Over the Cuckoo's Nest", e:"🚪", a:true, b:1937, f:"Hasn't made a film since 2010, but still shows up courtside at Lakers games."},
-  {n:"Keith Richards", k:"The Rolling Stones", e:"🎸", a:true, b:1943, f:"Topped 'next rock star to die' lists for decades. Has outlived most of the people who made those lists."},
-  {n:"Cliff Richard", k:"Summer Holiday · Christmas No. 1s", e:"🎄", a:true, b:1940, f:"Still touring. Has had UK hits in every decade from the 1950s to the 2010s."},
-  {n:"Tom Jones", k:"It's Not Unusual · Sex Bomb", e:"🩲", a:true, b:1940, f:"In 2023, 'Tom Jones dies' trended. It was a different Tom Jones, the writer of the musical The Fantasticks."},
-  {n:"Joan Collins", k:"Dynasty's Alexis Carrington", e:"💄", a:true, b:1933, f:"Still glamorous, still acting, still married to a man 32 years her junior."},
-  {n:"Paul McCartney", k:"The Beatles", e:"🪲", a:true, b:1942, f:"The 'Paul is dead' conspiracy started in 1969. He's been not-dead ever since."},
-  {n:"Jerry Mathers", k:"Leave It to Beaver", e:"🦫", a:true, b:1948, f:"Newspapers wrongly reported he was killed in Vietnam in the late 60s."},
-  {n:"Mr. T", k:"The A-Team · Rocky III", e:"📿", a:true, b:1952, f:"I pity the fool who thought he was dead."},
-  {n:"Vanilla Ice", k:"Ice Ice Baby", e:"🧊", a:true, b:1967, f:"Spent years flipping houses on TV. Stop, collaborate and listen."},
-  {n:"MC Hammer", k:"U Can't Touch This", e:"🔨", a:true, b:1962, f:"Went from bankrupt to Silicon Valley tech investor. Can't touch him."},
-  {n:"Lee Majors", k:"The Six Million Dollar Man", e:"🦾", a:true, b:1939, f:"Still with us, and still technically better, stronger, faster."},
-  {n:"Burt Ward", k:"Robin in 1960s Batman", e:"🦸", a:true, b:1945, f:"Holy longevity, Batman! He got his Hollywood Walk of Fame star in 2020."},
-  {n:"Christopher Lloyd", k:"Doc Brown in Back to the Future", e:"⚡", a:true, b:1938, f:"Still working. Great Scott!"},
-  {n:"Jane Fonda", k:"Barbarella · 80s workout videos", e:"🏋️", a:true, b:1937, f:"Feel the burn. Still acting and still getting arrested at climate protests."},
-  {n:"Paul Hogan", k:"Crocodile Dundee", e:"🐊", a:true, b:1939, f:"That's not a knife… and he's not dead."},
-  {n:"Iggy Pop", k:"Lust for Life · The Stooges", e:"🦎", a:true, b:1947, f:"Spent the 70s doing things that should have killed him. Still shirtless, still touring."},
-  {n:"Noel Edmonds", k:"Deal or No Deal · House Party", e:"📦", a:true, b:1948, f:"Moved to New Zealand. Mr Blobby has not been confirmed either way."},
-  {n:"Ringo Starr", k:"The Beatles' drummer", e:"🥁", a:true, b:1940, f:"Peace and love! Still touring with his All-Starr Band."},
-  {n:"Bob Dylan", k:"Blowin' in the Wind", e:"🎶", a:true, b:1941, f:"Won the Nobel Prize for Literature in 2016 and took weeks to acknowledge it."},
-  {n:"Cher", k:"Believe · Moonstruck", e:"💫", a:true, b:1946, f:"Do you believe in life after… well, she's still alive."},
-  {n:"Jackie Chan", k:"Rush Hour · Police Story", e:"🪜", a:true, b:1954, f:"Has broken nearly every bone in his body doing his own stunts. Still alive."},
-  {n:"Danny DeVito", k:"Taxi · Twins", e:"🥚", a:true, b:1944, f:"Still terrorising Philadelphia on It's Always Sunny."},
-  {n:"Henry Winkler", k:"The Fonz in Happy Days", e:"👍", a:true, b:1945, f:"Ayyyy! He won his first Emmy in 2018, 44 years after Happy Days began."},
-  {n:"David Hasselhoff", k:"Knight Rider · Baywatch", e:"🏖️", a:true, b:1952, f:"Still huge in Germany."},
-  {n:"Erik Estrada", k:"Ponch in CHiPs", e:"🏍️", a:true, b:1949, f:"Became a real reserve police officer after playing one on TV."},
-  {n:"Leo Sayer", k:"You Make Me Feel Like Dancing", e:"🌀", a:true, b:1948, f:"Moved to Australia, curls intact."},
-  {n:"Shakin' Stevens", k:"Merry Christmas Everyone", e:"🎅", a:true, b:1948, f:"Gets an annual comeback every December."},
-  {n:"Macaulay Culkin", k:"Home Alone", e:"😱", a:true, b:1980, f:"A recurring internet death hoax target since 2014. Got his Walk of Fame star in 2023."},
-  {n:"Rick Astley", k:"Never Gonna Give You Up", e:"🎙️", a:true, b:1966, f:"Never gonna give you up. Never gonna die (so far)."},
-  {n:"Frank Bruno", k:"Boxing champ · panto star", e:"🥊", a:true, b:1961, f:"Know what I mean, 'Arry?"},
-  {n:"Timmy Mallett", k:"Wacaday · Itsy Bitsy", e:"🔨", a:true, b:1955, f:"Still has the mallet. Still has the glasses."},
+  // ===== Film & TV: alive =====
+  {n:"Dick Van Dyke", c:"film", k:"Mary Poppins · Diagnosis: Murder", e:"☂️", a:true, b:1925, f:"Turned 100 in December 2025. Still dancing, still doing that accent."},
+  {n:"Mel Brooks", c:"film", k:"Blazing Saddles · Spaceballs", e:"🌌", a:true, b:1926, f:"Turned 100 in June 2026. The 2000 Year Old Man is only 1,900 short."},
+  {n:"William Shatner", c:"tv", k:"Captain Kirk · Boston Legal", e:"🛸", a:true, b:1931, f:"Went to actual space in 2021, aged 90."},
+  {n:"Clint Eastwood", c:"film", k:"Dirty Harry · Gran Torino", e:"🔫", a:true, b:1930, f:"Directed a film at 94. Do you feel lucky?"},
+  {n:"Sophia Loren", c:"film", k:"Italian screen goddess", e:"🎞️", a:true, b:1934, f:"The first actor to win an Oscar for a non-English-language role, in 1962."},
+  {n:"Michael Caine", c:"film", k:"The Italian Job · Batman's Alfred", e:"🚐", a:true, b:1933, f:"Retired from acting in 2023. You were only supposed to blow the bloody doors off!"},
+  {n:"Jack Nicholson", c:"film", k:"The Shining · One Flew Over the Cuckoo's Nest", e:"🚪", a:true, b:1937, f:"Hasn't made a film since 2010, but still turns up courtside at Lakers games."},
+  {n:"Joan Collins", c:"tv", k:"Dynasty's Alexis Carrington", e:"💄", a:true, b:1933, f:"Still glamorous, still acting, still married to a man 32 years her junior."},
+  {n:"Mr. T", c:"tv", k:"The A-Team · Rocky III", e:"📿", a:true, b:1952, f:"I pity the fool who thought he was dead."},
+  {n:"Christopher Lloyd", c:"film", k:"Doc Brown in Back to the Future", e:"⚡", a:true, b:1938, f:"Still working. Great Scott!"},
+  {n:"Jane Fonda", c:"film", k:"Barbarella · 80s workout videos · Grace and Frankie", e:"🏋️", a:true, b:1937, f:"Feel the burn. Still acting, still getting arrested at climate protests."},
+  {n:"Paul Hogan", c:"film", k:"Crocodile Dundee", e:"🐊", a:true, b:1939, f:"That's not a knife… and he's not dead."},
+  {n:"Noel Edmonds", c:"tv", k:"Deal or No Deal · House Party", e:"📦", a:true, b:1948, f:"Moved to New Zealand. Mr Blobby's status is unconfirmed."},
+  {n:"Jackie Chan", c:"film", k:"Rush Hour · Police Story", e:"🪜", a:true, b:1954, f:"Has broken nearly every bone in his body doing his own stunts."},
+  {n:"Danny DeVito", c:"film", k:"Twins · Matilda · It's Always Sunny", e:"🥚", a:true, b:1944, f:"Still terrorising Philadelphia on It's Always Sunny."},
+  {n:"Henry Winkler", c:"tv", k:"The Fonz in Happy Days", e:"👍", a:true, b:1945, f:"Ayyyy! Won his first Emmy in 2018, 44 years after Happy Days began."},
+  {n:"David Hasselhoff", c:"tv", k:"Knight Rider · Baywatch", e:"🏖️", a:true, b:1952, f:"Still huge in Germany."},
+  {n:"Macaulay Culkin", c:"film", k:"Home Alone", e:"😱", a:true, b:1980, f:"A recurring internet death hoax target since 2014."},
+  {n:"Timmy Mallett", c:"tv", k:"Wacaday · Itsy Bitsy", e:"🔨", a:true, b:1955, f:"Still has the mallet. Still has the glasses."},
+  {n:"Mary Berry", c:"tv", k:"The Great British Bake Off", e:"🎂", a:true, b:1935, f:"Picked up a BAFTA Fellowship in 2026, aged 91. No soggy bottoms."},
+  {n:"Delia Smith", c:"tv", k:"TV cook · Norwich City owner", e:"🍳", a:true, b:1941, f:"'Let's be 'avin' you!' — her half-time pitch rant in 2005."},
+  // ===== Music: alive =====
+  {n:"Willie Nelson", c:"music", k:"On the Road Again", e:"🎸", a:true, b:1933, f:"One of the most death-hoaxed people on earth. Still on the road again."},
+  {n:"Keith Richards", c:"music", k:"The Rolling Stones", e:"🎸", a:true, b:1943, f:"Topped 'next rock star to die' lists for decades. Has outlived most of the people who wrote them."},
+  {n:"Cliff Richard", c:"music", k:"Summer Holiday · Christmas No. 1s", e:"🎄", a:true, b:1940, f:"Still touring. Had UK hits in every decade from the 1950s to the 2010s."},
+  {n:"Tom Jones", w:"Tom Jones (singer)", c:"music", k:"It's Not Unusual · Sex Bomb · The Voice", e:"🩲", a:true, b:1940, f:"In 2023, 'Tom Jones dies' trended. It was a different Tom Jones, the writer of the musical The Fantasticks."},
+  {n:"Paul McCartney", c:"music", k:"The Beatles", e:"🪲", a:true, b:1942, f:"The 'Paul is dead' conspiracy started in 1969. He's been not-dead ever since."},
+  {n:"Ringo Starr", c:"music", k:"The Beatles' drummer · Thomas the Tank Engine narrator", e:"🥁", a:true, b:1940, f:"Peace and love! Still touring with his All-Starr Band."},
+  {n:"Bob Dylan", c:"music", k:"Blowin' in the Wind", e:"🎶", a:true, b:1941, f:"Won the Nobel Prize for Literature in 2016 and took weeks to acknowledge it."},
+  {n:"Cher", c:"music", k:"Believe · Moonstruck", e:"💫", a:true, b:1946, f:"Do you believe in life after… well, she's still alive."},
+  {n:"Iggy Pop", c:"music", k:"Lust for Life · The Passenger", e:"🦎", a:true, b:1947, f:"Spent the 70s doing things that should have killed him. Still shirtless, still touring."},
+  {n:"Vanilla Ice", c:"music", k:"Ice Ice Baby", e:"🧊", a:true, b:1967, f:"Spent years flipping houses on TV. Stop, collaborate and listen."},
+  {n:"MC Hammer", c:"music", k:"U Can't Touch This", e:"🔨", a:true, b:1962, f:"Went from bankrupt to Silicon Valley tech investor."},
+  {n:"Shakin' Stevens", c:"music", k:"Merry Christmas Everyone", e:"🎅", a:true, b:1948, f:"Gets an annual comeback every December."},
+  {n:"Rick Astley", c:"music", k:"Never Gonna Give You Up", e:"🎙️", a:true, b:1966, f:"Never gonna give you up. Never gonna die (so far)."},
+  // ===== Politics: alive =====
+  {n:"Michael Heseltine", c:"politics", k:"Thatcher's rival · 'Tarzan'", e:"🦍", a:true, b:1933, f:"Grabbed the Commons mace and swung it over his head in 1976. Still weighing in on politics in his 90s."},
+  {n:"John Major", c:"politics", k:"UK Prime Minister 1990–97", e:"🏏", a:true, b:1943, f:"His dad was a music hall and circus performer."},
+  {n:"Joe Biden", c:"politics", k:"US President 2021–25", e:"🍦", a:true, b:1942, f:"Was the oldest person ever sworn in as US president — until Trump in 2025."},
+  {n:"Bill Clinton", c:"politics", k:"US President 1993–2001", e:"🎷", a:true, b:1946, f:"Played the saxophone on The Arsenio Hall Show while campaigning in 1992."},
+  {n:"George W. Bush", c:"politics", k:"US President 2001–09", e:"🖌️", a:true, b:1946, f:"Took up painting after leaving office. Mostly dogs and world leaders."},
+  {n:"Bernie Sanders", c:"politics", k:"US senator · the mittens meme", e:"🧤", a:true, b:1941, f:"His mittens at the 2021 inauguration became one of the biggest memes of the year."},
+  {n:"Edwina Currie", c:"politics", k:"Tory minister · the eggs scandal", e:"🥚", a:true, b:1946, f:"Resigned in 1988 after saying most British eggs had salmonella."},
+  {n:"Arnold Schwarzenegger", c:"politics", k:"The Terminator · Governor of California", e:"🤖", a:true, b:1947, f:"Governor of California 2003–11. He said he'd be back."},
+  // ===== Royalty & religion: alive =====
+  {n:"The Dalai Lama", w:"14th Dalai Lama", c:"royal", k:"Tibetan spiritual leader", e:"🙏", a:true, b:1935, f:"Celebrated his 91st birthday in July 2026."},
+  // ===== Sport: alive =====
+  {n:"Paul Gascoigne", c:"sport", k:"Gazza · Italia 90 tears", e:"😭", a:true, b:1967, f:"Despite decades of worrying headlines, still with us."},
+  {n:"Mike Tyson", c:"sport", k:"Heavyweight champ · The Hangover", e:"🐯", a:true, b:1966, f:"Boxed Jake Paul in 2024, aged 58."},
+  {n:"Eddie 'the Eagle' Edwards", w:"Michael Edwards (ski jumper)", c:"sport", k:"Britain's lovable Olympic ski jumper", e:"🎿", a:true, b:1963, f:"Came last at the 1988 Winter Olympics and became a national hero."},
+  {n:"Bernie Ecclestone", c:"sport", k:"Ran Formula 1 for 40 years", e:"🏁", a:true, b:1930, f:"Became a dad again at 89. Still giving his F1 opinions in 2026."},
+  {n:"Frank Bruno", c:"sport", k:"Boxing champ · panto star", e:"🥊", a:true, b:1961, f:"Know what I mean, 'Arry?"},
+  // ===== Science, nature & other: alive =====
+  {n:"David Attenborough", c:"science", k:"Planet Earth · Blue Planet", e:"🦍", a:true, b:1926, f:"Turned 100 in May 2026, and still making nature films."},
+  {n:"Buzz Aldrin", c:"science", k:"Second man on the Moon", e:"👨‍🚀", a:true, b:1930, f:"Got married for the fourth time on his 93rd birthday."},
+  {n:"Uri Geller", c:"misc", k:"Spoon-bending psychic", e:"🥄", a:true, b:1946, f:"Still bending spoons. Bought an island off Scotland in 2009."},
 ];
 
 /* ------------------------------------------------------------------ */
@@ -342,6 +401,7 @@ function start(useChallenge){
   seed = (useChallenge && challenge) ? challenge.seed : (Math.random()*2**32)>>>0;
   if(!useChallenge) challenge = null;
   deck = buildDeck(seed); idx = 0; answers = []; streak = 0; best = 0;
+  deck.forEach(photoFor); // prefetch
   show('play'); renderCards(); updateHud();
 }
 
@@ -349,15 +409,42 @@ function portraitBg(name){
   const h = hash(name)%360;
   return `linear-gradient(150deg, hsl(${h} 85% 72%), hsl(${(h+50)%360} 80% 58%))`;
 }
+// ---- photos: lead image from Wikipedia (free-licensed), loaded in the player's browser; emoji if none
+// Prefers photos downloaded by tools/fetch_photos.py (photos/manifest.json), else asks Wikipedia live.
+const photoCache = {};
+const manifestP = fetch('photos/manifest.json').then(r=>r.ok?r.json():{}).catch(()=>({}));
+function photoFor(p){
+  if(photoCache[p.n]) return photoCache[p.n];
+  return photoCache[p.n] = manifestP.then(m=>{
+    const e = m[p.n];
+    if(e) return {big:'photos/'+e.file, small:'photos/'+e.file,
+      credit:[e.artist, e.license].filter(Boolean).join(' · '), source:e.source};
+    const title = encodeURIComponent((p.w||p.n).replace(/ /g,'_'));
+    return fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${title}`)
+      .then(r=>r.ok?r.json():null)
+      .then(j=>{ const t=j&&j.thumbnail&&j.thumbnail.source; if(!t) return null;
+        return {big:t.replace(/\/\d+px-/,'/640px-'), small:t, credit:'Wikipedia',
+          source:j.content_urls&&j.content_urls.desktop&&j.content_urls.desktop.page}; });
+  }).catch(()=>null);
+}
+function loadPhoto(card,p){
+  photoFor(p).then(ph=>{
+    if(!ph||!card.isConnected) return;
+    const img=new Image(); img.alt=''; img.draggable=false; img.referrerPolicy='no-referrer';
+    img.onload=()=>img.classList.add('ok');
+    img.onerror=()=>{ if(img.src!==ph.small) img.src=ph.small; };
+    img.src=ph.big; card.querySelector('.portrait').prepend(img);
+  });
+}
 function cardHTML(p, n){
-  return `<div class="portrait" style="background:${portraitBg(p.n)}"><span class="q">#${n}</span>${p.e}
+  return `<div class="portrait" style="background:${portraitBg(p.n)}"><span class="q">#${n}</span><span class="cat">${CATS[p.c]||''}</span><span class="emo">${p.e}</span>
       <div class="stamp alive">ALIVE</div><div class="stamp dead">DEAD</div></div>
     <div class="info"><h2>${p.n}</h2><p>${p.k}</p></div>`;
 }
 function renderCards(){
   const d = $('#deck'); d.innerHTML='';
-  if(deck[idx+1]){const b=document.createElement('div');b.className='card back';b.innerHTML=cardHTML(deck[idx+1],idx+2);d.appendChild(b)}
-  const c=document.createElement('div');c.className='card';c.id='top';c.innerHTML=cardHTML(deck[idx],idx+1);d.appendChild(c);
+  if(deck[idx+1]){const b=document.createElement('div');b.className='card back';b.innerHTML=cardHTML(deck[idx+1],idx+2);d.appendChild(b);loadPhoto(b,deck[idx+1])}
+  const c=document.createElement('div');c.className='card';c.id='top';c.innerHTML=cardHTML(deck[idx],idx+1);d.appendChild(c);loadPhoto(c,deck[idx]);
   attachDrag(c);
 }
 function updateHud(){
@@ -402,6 +489,10 @@ function answer(saidAlive){
   v.className='verdict '+(ok?'ok':'no');
   $('#truth').innerHTML = p.a ? `💚 <b>${p.n}</b> is alive (born ${p.b}).` : `💀 <b>${p.n}</b> died in ${p.d}, aged ${p.age}.`;
   $('#fact').textContent = p.f.replace(/^Died (in|on) [^.]*\.\s*/,'');
+  const cr=$('#credit'); cr.textContent='';
+  photoFor(p).then(ph=>{ if(!ph||!ph.credit) return;
+    const a=document.createElement('a'); a.textContent='📷 '+ph.credit; a.target='_blank'; a.rel='noopener';
+    if(ph.source) a.href=ph.source; cr.replaceChildren(a); });
   $('#nextBtn').textContent = idx+1>=ROUND ? 'See my score →' : 'Next →';
   setTimeout(()=>$('#sheet').classList.add('on'),180);
 }
