@@ -107,20 +107,13 @@ button{font:inherit;color:inherit;cursor:pointer}
 .controls .alive{background:var(--alive);color:#fff}
 .hint{text-align:center;font-size:13px;margin-top:10px}
 
-/* reveal sheet */
-.sheet{
-  position:fixed;left:0;right:0;bottom:0;z-index:20;transform:translateY(105%);transition:transform .32s cubic-bezier(.2,1,.3,1);
-  display:flex;justify-content:center;padding:0 12px calc(12px + env(safe-area-inset-bottom));
-}
-.sheet.on{transform:none}
-.sheet .inner{max-width:440px;width:100%;background:var(--card);border:3px solid var(--line);border-radius:22px;padding:18px 18px 16px;box-shadow:var(--shadow)}
-.verdict{font-size:30px;font-weight:800;margin:0;letter-spacing:-.02em}
-.verdict.ok{color:var(--alive)} .verdict.no{color:var(--dead)}
-.truth{font-size:18px;font-weight:600;margin:6px 0 0}
-.fact{font-size:15px;color:var(--muted);margin:8px 0 14px;line-height:1.35}
-.sheet .btn{width:100%}
-.credit{font-size:11px;color:var(--muted);margin:-8px 0 12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.credit a{color:inherit}
+/* quick verdict flash */
+.flash{position:absolute;left:50%;top:-6px;z-index:10;transform:translate(-50%,-6px) scale(.9);opacity:0;pointer-events:none;
+  width:max-content;max-width:94%;text-align:center;line-height:1.2;font-weight:800;font-size:15px;padding:8px 14px;border:3px solid var(--line);border-radius:99px;color:#fff;box-shadow:3px 3px 0 var(--line);transition:opacity .18s, transform .18s}
+.flash.ok{background:var(--alive)} .flash.no{background:var(--dead)}
+.flash.on{opacity:1;transform:translate(-50%,0) scale(1)}
+.card.enter{animation:rise .22s ease-out}
+@keyframes rise{from{transform:scale(.94) translateY(14px)}}
 
 /* ---------- end ---------- */
 .result{text-align:center;display:flex;flex-direction:column;gap:14px;padding-top:8px}
@@ -134,11 +127,19 @@ button{font:inherit;color:inherit;cursor:pointer}
 .namebox input{flex:1;min-width:0;font:inherit;font-size:16px;font-weight:600;padding:12px 14px;border:3px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink)}
 .share-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .share-row .wide{grid-column:1/-1}
-.review{text-align:left;border:3px solid var(--line);border-radius:16px;background:var(--card);overflow:hidden}
-.review summary{padding:12px 14px;font-weight:800;cursor:pointer}
-.review ol{margin:0;padding:0 14px 12px 14px;list-style:none}
-.review li{display:flex;gap:10px;align-items:baseline;padding:8px 0;border-top:1px solid color-mix(in srgb,var(--line) 20%,transparent);font-size:15px}
-.review li b{flex:1}
+.review{text-align:left}
+.review h3{margin:6px 0 10px;font-size:22px;letter-spacing:-.01em}
+.review ol{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px}
+.review li{display:grid;grid-template-columns:64px 1fr;gap:12px;align-items:start;padding:10px;border:3px solid var(--line);border-radius:16px;background:var(--card)}
+.review li.no{border-color:var(--dead)}
+.thumb{width:64px;height:64px;border-radius:12px;border:2px solid var(--line);display:grid;place-items:center;font-size:32px;overflow:hidden;position:relative}
+.thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 20%}
+.rv-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rv-top b{font-size:17px;margin-right:auto}
+.rv-you{font-size:13px;font-weight:600;color:var(--muted);margin:3px 0 0}
+.rv-fact{font-size:14px;line-height:1.35;margin:5px 0 0}
+.credit{font-size:11px;color:var(--muted);margin:4px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.credit a{color:inherit}
 .tag{font-size:12px;font-weight:800;padding:2px 8px;border-radius:99px;white-space:nowrap}
 .tag.alive{background:var(--alive-soft);color:var(--alive)} .tag.dead{background:var(--dead-soft);color:var(--dead)}
 </style>
@@ -168,12 +169,12 @@ button{font:inherit;color:inherit;cursor:pointer}
       <div class="progress"><i id="bar"></i></div>
       <span class="streak" id="streak">🔥 0</span>
     </div>
-    <div class="deck" id="deck"></div>
+    <div class="deck" id="deck"><div class="flash" id="flash"></div></div>
     <div class="controls">
       <button class="btn dead" id="deadBtn">💀 Dead</button>
       <button class="btn alive" id="aliveBtn">Alive 💚</button>
     </div>
-    <p class="hint muted">Swipe, tap, or use ← →</p>
+    <p class="hint muted">Swipe, tap, or use ← →. Fun facts at the end.</p>
   </section>
 
   <!-- END -->
@@ -194,25 +195,16 @@ button{font:inherit;color:inherit;cursor:pointer}
         <button class="btn small" id="copyBtn">Copy link</button>
         <button class="btn small wide" id="imgBtn">🖼️ Save score card</button>
       </div>
-      <details class="review">
-        <summary>See all the answers</summary>
+      <div class="review">
+        <h3>The answers</h3>
         <ol id="review"></ol>
-      </details>
+      </div>
       <button class="btn" id="againBtn">Play again (new stars)</button>
       <p class="fine">Facts checked November 2026. Celebrities, inconveniently, keep changing status. Photos from Wikipedia / Wikimedia Commons.</p>
     </div>
   </section>
 </div>
 
-<div class="sheet" id="sheet">
-  <div class="inner">
-    <p class="verdict" id="verdict"></p>
-    <p class="truth" id="truth"></p>
-    <p class="fact" id="fact"></p>
-    <p class="credit" id="credit"></p>
-    <button class="btn primary" id="nextBtn">Next →</button>
-  </div>
-</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -441,10 +433,11 @@ function cardHTML(p, n){
       <div class="stamp alive">ALIVE</div><div class="stamp dead">DEAD</div></div>
     <div class="info"><h2>${p.n}</h2><p>${p.k}</p></div>`;
 }
-function renderCards(){
-  const d = $('#deck'); d.innerHTML='';
+function renderCards(animate){
+  const d = $('#deck'); const fl=$('#flash'); d.innerHTML=''; if(fl) d.appendChild(fl);
   if(deck[idx+1]){const b=document.createElement('div');b.className='card back';b.innerHTML=cardHTML(deck[idx+1],idx+2);d.appendChild(b);loadPhoto(b,deck[idx+1])}
-  const c=document.createElement('div');c.className='card';c.id='top';c.innerHTML=cardHTML(deck[idx],idx+1);d.appendChild(c);loadPhoto(c,deck[idx]);
+  const c=document.createElement('div');c.className='card';c.id='top';c.innerHTML=cardHTML(deck[idx],idx+1);d.appendChild(c);
+  if(animate){c.classList.add('enter');c.addEventListener('animationend',()=>c.classList.remove('enter'),{once:true})}loadPhoto(c,deck[idx]);
   attachDrag(c);
 }
 function updateHud(){
@@ -472,6 +465,16 @@ function attachDrag(card){
   card.addEventListener('pointerup',end); card.addEventListener('pointercancel',end);
 }
 
+let flashT;
+function flash(ok, p){
+  const f=$('#flash'); clearTimeout(flashT);
+  f.className='flash '+(ok?'ok':'no');
+  const right=['Correct','Nailed it','Spot on','Yep'], wrong=['Nope','Wrong','Oof'];
+  const word=(ok?right:wrong)[Math.floor(Math.random()*(ok?4:3))];
+  f.textContent = `${ok?'✓':'✗'} ${word}${ok&&streak>=3?' 🔥'+streak:''} · ${p.n} ${p.a?'is alive':'died in '+p.d}`;
+  requestAnimationFrame(()=>f.classList.add('on'));
+  flashT=setTimeout(()=>f.classList.remove('on'),1400);
+}
 function answer(saidAlive){
   if(busy || idx>=deck.length) return; busy=true;
   const p=deck[idx], card=$('#top'), ok = saidAlive===p.a;
@@ -480,27 +483,12 @@ function answer(saidAlive){
   answers.push({p, saidAlive, ok});
   streak = ok ? streak+1 : 0; best=Math.max(best,streak);
   if(navigator.vibrate) try{navigator.vibrate(ok?20:[40,60,40])}catch(e){}
-  updateHud();
-  // reveal
-  const v=$('#verdict');
-  const right=['Correct!','Nailed it!','Spot on!','Psychic!','Yep!'], wrong=['Wrong!','Nope!','Oof.','Not quite!'];
-  const pick=a=>a[Math.floor(Math.random()*a.length)];
-  v.textContent = ok ? (streak>=3?`${pick(right)} 🔥${streak}`:pick(right)) : pick(wrong);
-  v.className='verdict '+(ok?'ok':'no');
-  $('#truth').innerHTML = p.a ? `💚 <b>${p.n}</b> is alive (born ${p.b}).` : `💀 <b>${p.n}</b> died in ${p.d}, aged ${p.age}.`;
-  $('#fact').textContent = p.f.replace(/^Died (in|on) [^.]*\.\s*/,'');
-  const cr=$('#credit'); cr.textContent='';
-  photoFor(p).then(ph=>{ if(!ph||!ph.credit) return;
-    const a=document.createElement('a'); a.textContent='📷 '+ph.credit; a.target='_blank'; a.rel='noopener';
-    if(ph.source) a.href=ph.source; cr.replaceChildren(a); });
-  $('#nextBtn').textContent = idx+1>=ROUND ? 'See my score →' : 'Next →';
-  setTimeout(()=>$('#sheet').classList.add('on'),180);
-}
-function next(){
-  if(!busy) return;
-  $('#sheet').classList.remove('on'); idx++; busy=false;
-  if(idx>=ROUND) return finish();
-  renderCards(); updateHud();
+  flash(ok,p); updateHud();
+  setTimeout(()=>{
+    idx++;
+    if(idx>=ROUND){ setTimeout(finish,900); return }
+    renderCards(true); updateHud(); busy=false;
+  },230);
 }
 
 // ---- end
@@ -530,7 +518,21 @@ function finish(){
     const who = challenge.name||'your friend';
     vs.textContent = s>challenge.score ? `🏆 You beat ${who} (${challenge.score})!` : s===challenge.score ? `🤝 Tied with ${who}!` : `😵 ${who} wins (${challenge.score}). Rematch?`;
   } else vs.textContent = best>=5 ? `Best streak: 🔥${best}` : '';
-  $('#review').innerHTML = answers.map(a=>`<li><span>${a.ok?'✅':'❌'}</span><b>${a.p.n}</b><span class="tag ${a.p.a?'alive':'dead'}">${a.p.a?'Alive':'Died '+a.p.d}</span></li>`).join('');
+  const ol=$('#review'); ol.innerHTML='';
+  answers.forEach(a=>{
+    const p=a.p, li=document.createElement('li'); li.className=a.ok?'ok':'no';
+    li.innerHTML=`<div class="thumb" style="background:${portraitBg(p.n)}">${p.e}</div>
+      <div><div class="rv-top"><b>${p.n}</b><span class="tag ${p.a?'alive':'dead'}">${p.a?'Alive · b. '+p.b:'Died '+p.d+', aged '+p.age}</span></div>
+      <p class="rv-you">${a.ok?'✅':'❌'} You said ${a.saidAlive?'alive':'dead'}</p>
+      <p class="rv-fact">${escapeHtml(p.f.replace(/^Died (in|on) [^.,]*[.,]\s*/,'').replace(/^./,c=>c.toUpperCase()))}</p><p class="credit"></p></div>`;
+    ol.appendChild(li);
+    photoFor(p).then(ph=>{ if(!ph) return;
+      const img=new Image(); img.alt=''; img.referrerPolicy='no-referrer';
+      img.onerror=()=>{ if(img.src!==ph.small) img.src=ph.small; else img.remove(); };
+      img.src=ph.big; li.querySelector('.thumb').appendChild(img);
+      if(ph.credit){ const c=document.createElement('a'); c.textContent='📷 '+ph.credit; c.target='_blank'; c.rel='noopener'; if(ph.source) c.href=ph.source; li.querySelector('.credit').appendChild(c); }
+    });
+  });
   $('#name').value = store.get('doa-name')||'';
   $('#bar').style.width='100%';
   show('end'); window.scrollTo(0,0);
@@ -626,7 +628,6 @@ async function saveImage(){
 $('#playBtn').onclick=()=>start(!!challenge);
 $('#deadBtn').onclick=()=>answer(false);
 $('#aliveBtn').onclick=()=>answer(true);
-$('#nextBtn').onclick=next;
 $('#againBtn').onclick=()=>{history.replaceState(null,'',location.pathname);$('#challenge').classList.remove('on');start(false)};
 $('#shareBtn').onclick=shareMain;
 $('#imgBtn').onclick=saveImage;
@@ -634,7 +635,6 @@ $('#copyBtn').onclick=async()=>{ toast(await copy(shareText()+'\n'+shareUrl())?'
 $('#waBtn').onclick=()=>window.open('https://wa.me/?text='+encodeURIComponent(shareText()+'\n'+shareUrl()),'_blank','noopener');
 document.addEventListener('keydown',e=>{
   if(!$('#play').classList.contains('on')) return;
-  if($('#sheet').classList.contains('on')){ if(['Enter',' ','ArrowRight','ArrowLeft'].includes(e.key)){e.preventDefault();next()} return }
   if(e.key==='ArrowLeft') answer(false); else if(e.key==='ArrowRight') answer(true);
 });
 </script>
